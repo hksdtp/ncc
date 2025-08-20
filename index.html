@@ -1088,9 +1088,13 @@
 
     <script>
         // App Version for cache busting
-        const APP_VERSION = '2.6.0-emergency-fix';
+        const APP_VERSION = '2.7.0-local-only';
         const BUILD_TIME = new Date().toISOString();
-        console.log(`🚨 EMERGENCY FIX v${APP_VERSION} - Built: ${BUILD_TIME}`);
+        console.log(`🚨 LOCAL-ONLY MODE v${APP_VERSION} - Built: ${BUILD_TIME}`);
+
+        // EMERGENCY: DISABLE SUPABASE STORAGE - USE LOCAL ONLY
+        const EMERGENCY_LOCAL_MODE = true;
+        console.log('🚨 EMERGENCY: Supabase Storage DISABLED - Using LOCAL ONLY mode');
 
         // FORCE CACHE CLEAR
         const timestamp = Date.now();
@@ -1806,28 +1810,39 @@
                         renderMediaGrid();
                         showNotification(`Đã tải lên ${file.name} thành công!`);
                         
-                        // Auto-upload to Supabase immediately (PRIORITY)
-                        if (isSupabaseConnected) {
-                            console.log('🔄 Starting immediate Supabase upload for:', file.name);
-                            uploadSingleMediaToSupabase(currentSupplierId, mediaItem).then(uploadedItem => {
-                                if (uploadedItem) {
-                                    console.log('✅ Supabase upload successful:', uploadedItem.supabase_url);
-                                    // Update local storage with Supabase info
-                                    saveMediaToStorage();
-                                    // Refresh display to show cloud status
-                                    renderMediaGrid();
-                                    // Sync metadata to database
-                                    syncMediaToSupabase(currentSupplierId, supplierMedia[currentSupplierId]);
-                                } else {
-                                    console.error('❌ Supabase upload failed for:', file.name);
-                                }
-                            }).catch(error => {
-                                console.error('❌ Upload error:', error);
-                                showNotification('Lỗi upload lên cloud: ' + error.message, 'error');
-                            });
+                        // EMERGENCY: SKIP SUPABASE STORAGE - LOCAL ONLY
+                        if (EMERGENCY_LOCAL_MODE) {
+                            console.log('🚨 EMERGENCY MODE: Skipping Supabase Storage upload');
+                            showNotification('✅ Ảnh đã lưu cục bộ (Emergency Mode)', 'success');
+
+                            // Still sync metadata to database if connected
+                            if (isSupabaseConnected) {
+                                console.log('📊 Syncing metadata to database...');
+                                syncMediaToSupabase(currentSupplierId, supplierMedia[currentSupplierId]).catch(error => {
+                                    console.warn('⚠️ Metadata sync failed:', error);
+                                });
+                            }
                         } else {
-                            console.warn('⚠️ Supabase not connected - file saved locally only');
-                            showNotification('Ảnh đã lưu cục bộ. Kết nối Supabase để đồng bộ cloud.', 'warning');
+                            // Original Supabase upload logic
+                            if (isSupabaseConnected) {
+                                console.log('🔄 Starting immediate Supabase upload for:', file.name);
+                                uploadSingleMediaToSupabase(currentSupplierId, mediaItem).then(uploadedItem => {
+                                    if (uploadedItem) {
+                                        console.log('✅ Supabase upload successful:', uploadedItem.supabase_url);
+                                        saveMediaToStorage();
+                                        renderMediaGrid();
+                                        syncMediaToSupabase(currentSupplierId, supplierMedia[currentSupplierId]);
+                                    } else {
+                                        console.error('❌ Supabase upload failed for:', file.name);
+                                    }
+                                }).catch(error => {
+                                    console.error('❌ Upload error:', error);
+                                    showNotification('Lỗi upload lên cloud: ' + error.message, 'error');
+                                });
+                            } else {
+                                console.warn('⚠️ Supabase not connected - file saved locally only');
+                                showNotification('Ảnh đã lưu cục bộ. Kết nối Supabase để đồng bộ cloud.', 'warning');
+                            }
                         }
                     };
                     reader.readAsDataURL(file);
