@@ -1,0 +1,2273 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title id="page-title">Danh Mục Nhà Cung Cấp Thượng Hải - Phiên Bản Chỉnh Sửa</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        .editable {
+            position: relative;
+        }
+        .edit-mode .editable {
+            outline: 2px dashed #3B82F6;
+            outline-offset: 2px;
+            cursor: text;
+        }
+        .edit-mode .editable:hover {
+            outline-color: #1D4ED8;
+            background-color: rgba(59, 130, 246, 0.1);
+        }
+        .edit-indicator {
+            display: none;
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            background: #3B82F6;
+            color: white;
+            border-radius: 50%;
+            width: 16px;
+            height: 16px;
+            font-size: 10px;
+            justify-content: center;
+            align-items: center;
+            z-index: 10;
+        }
+        .edit-mode .edit-indicator {
+            display: flex;
+        }
+        .supplier-card, .product-card {
+            transition: all 0.3s ease;
+        }
+        .supplier-card:hover, .product-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        }
+         {
+            .no-print { display: none !important; }
+            body { print-color-adjust: exact; }
+        }
+        .floating-edit-toggle {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            background: linear-gradient(45deg, #667eea 0%, #764ba2 100%);
+            border-radius: 50px;
+            padding: 12px 20px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+        .slide-panel {
+            transform: translateX(100%);
+            transition: transform 0.3s ease-in-out;
+        }
+        .slide-panel.active {
+            transform: translateX(0);
+        }
+        
+        /* Modal styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 9999;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+        }
+        
+        .modal.active {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .modal-content {
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            width: 90%;
+            max-width: 600px;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 25px 50px rgba(0,0,0,0.2);
+            animation: modalSlideIn 0.3s ease;
+        }
+        
+        @keyframes modalSlideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .form-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 1rem;
+        }
+        
+        @media (min-width: 640px) {
+            .form-grid {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+        
+        .form-field {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .form-field.full-width {
+            grid-column: 1 / -1;
+        }
+        
+        .form-field label {
+            font-weight: 500;
+            margin-bottom: 0.5rem;
+            color: #374151;
+        }
+        
+        .form-field input,
+        .form-field select,
+        .form-field textarea {
+            padding: 0.75rem;
+            border: 1px solid #d1d5db;
+            border-radius: 0.5rem;
+            font-size: 0.875rem;
+            transition: border-color 0.15s;
+        }
+        
+        .form-field input:focus,
+        .form-field select:focus,
+        .form-field textarea:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+        
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+        
+        .status-not-contacted {
+            background-color: #f3f4f6;
+            color: #6b7280;
+        }
+        
+        .status-contacted {
+            background-color: #dbeafe;
+            color: #1d4ed8;
+        }
+        
+        .status-negotiating {
+            background-color: #fef3c7;
+            color: #d97706;
+        }
+        
+        .status-completed {
+            background-color: #d1fae5;
+            color: #059669;
+        }
+        
+        .status-cancelled {
+            background-color: #fee2e2;
+            color: #dc2626;
+        }
+        
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 1rem 1.5rem;
+            border-radius: 0.5rem;
+            font-weight: 500;
+            z-index: 10000;
+            transform: translateX(100%);
+            transition: transform 0.3s ease;
+        }
+        
+        .notification.show {
+            transform: translateX(0);
+        }
+        
+        .notification.success {
+            background-color: #d1fae5;
+            color: #059669;
+            border: 1px solid #10b981;
+        }
+        
+        .notification.error {
+            background-color: #fee2e2;
+            color: #dc2626;
+            border: 1px solid #f87171;
+        }
+        
+        .edit-icons {
+            display: none;
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            gap: 4px;
+        }
+        
+        .supplier-card:hover .edit-icons,
+        .product-card:hover .edit-icons {
+            display: flex;
+        }
+        
+        .edit-icon {
+            width: 24px;
+            height: 24px;
+            background: #3b82f6;
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 10px;
+            transition: background-color 0.15s;
+        }
+        
+        .edit-icon:hover {
+            background: #1d4ed8;
+        }
+        
+        /* Media Gallery Styles - New Side Panel Design */
+        .media-gallery {
+            position: fixed;
+            top: 0;
+            right: 0;
+            width: 0;
+            height: 100vh;
+            background: white;
+            z-index: 9999;
+            box-shadow: -4px 0 20px rgba(0, 0, 0, 0.15);
+            transition: width 0.3s ease;
+            overflow: hidden;
+        }
+        
+        .media-gallery.active {
+            width: 50vw;
+            min-width: 500px;
+        }
+        
+        .gallery-content {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            opacity: 0;
+            transform: translateX(20px);
+            transition: all 0.3s ease 0.1s;
+        }
+        
+        .media-gallery.active .gallery-content {
+            opacity: 1;
+            transform: translateX(0);
+        }
+        
+        .gallery-header {
+            padding: 1.5rem 2rem;
+            border-bottom: 1px solid #e5e7eb;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #f8fafc;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+        
+        .gallery-title {
+            font-size: 1.375rem;
+            font-weight: 700;
+            color: #1e293b;
+            display: flex;
+            align-items: center;
+        }
+        
+        .gallery-title i {
+            margin-right: 0.75rem;
+            color: #3b82f6;
+            font-size: 1.25rem;
+        }
+        
+        .gallery-close {
+            background: #ef4444;
+            border: none;
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            color: white;
+            transition: all 0.2s;
+            font-size: 1rem;
+        }
+        
+        .gallery-close:hover {
+            background: #dc2626;
+            transform: scale(1.05);
+        }
+        
+        .gallery-body {
+            flex: 1;
+            padding: 2rem;
+            overflow-y: auto;
+            background: #ffffff;
+        }
+        
+        .media-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 1.25rem;
+            margin-bottom: 2rem;
+        }
+        
+        .media-item {
+            aspect-ratio: 1;
+            border-radius: 12px;
+            overflow: hidden;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            background: white;
+            border: 3px solid #e2e8f0;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+        
+        .media-item:hover {
+            transform: translateY(-4px);
+            border-color: #3b82f6;
+            box-shadow: 0 8px 25px rgba(59, 130, 246, 0.2);
+        }
+        
+        .media-item img,
+        .media-item video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        
+        .media-item .play-icon {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+        }
+        
+        .upload-area {
+            border: 3px dashed #cbd5e1;
+            border-radius: 16px;
+            padding: 3rem 2rem;
+            text-align: center;
+            transition: all 0.3s ease;
+            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+            cursor: pointer;
+            margin-bottom: 2rem;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .upload-area::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.05) 0%, rgba(147, 51, 234, 0.05) 100%);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        
+        .upload-area:hover::before,
+        .upload-area.dragover::before {
+            opacity: 1;
+        }
+        
+        .upload-area:hover,
+        .upload-area.dragover {
+            border-color: #3b82f6;
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(59, 130, 246, 0.15);
+        }
+        
+        .upload-area input {
+            display: none;
+        }
+        
+        .upload-icon {
+            font-size: 4rem;
+            color: #94a3b8;
+            margin-bottom: 1.5rem;
+            transition: all 0.3s ease;
+        }
+        
+        .upload-area:hover .upload-icon {
+            color: #3b82f6;
+            transform: scale(1.1);
+        }
+        
+        /* Fullscreen viewer */
+        .fullscreen-viewer {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.98);
+            z-index: 10000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .fullscreen-viewer.active {
+            display: flex;
+        }
+        
+        .fullscreen-content {
+            max-width: 95vw;
+            max-height: 95vh;
+            position: relative;
+        }
+        
+        .fullscreen-content img,
+        .fullscreen-content video {
+            max-width: 100%;
+            max-height: 95vh;
+            object-fit: contain;
+        }
+        
+        .fullscreen-close {
+            position: absolute;
+            top: -50px;
+            right: 0;
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            color: white;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 1.2rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .fullscreen-close:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+        
+        .empty-gallery {
+            text-align: center;
+            padding: 3rem;
+            color: #6b7280;
+        }
+        
+        .empty-gallery i {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+            color: #d1d5db;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 font-sans">
+
+    <!-- Header -->
+    <header class="bg-white shadow-sm border-b sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center py-4">
+                <div class="flex items-center space-x-3">
+                    <div class="bg-blue-500 p-2 rounded-lg">
+                        <i class="fas fa-store text-white text-xl"></i>
+                    </div>
+                    <div>
+                        <h1 class="editable text-xl font-bold text-gray-900" data-key="main-title">Danh Mục Nhà Cung Cấp Thượng Hải</h1>
+                    </div>
+                </div>
+                
+
+                <!-- Settings Menu -->
+                <div class="no-print">
+                    <button id="settingsBtn" class="p-2 text-gray-400 hover:text-gray-600 transition">
+                        <i class="fas fa-cog text-xl"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Mobile Bottom Navigation -->
+    <div class="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg z-50 no-print">
+        <div class="flex justify-around py-2">
+            <button class="flex flex-col items-center py-2 px-4 text-blue-500">
+                <i class="fas fa-store text-xl"></i>
+                <span class="editable text-xs mt-1" data-key="mobile-nav-suppliers">Nhà Cung Cấp</span>
+            </button>
+            <button class="flex flex-col items-center py-2 px-4 text-gray-400">
+                <i class="fas fa-box text-xl"></i>
+                <span class="editable text-xs mt-1" data-key="mobile-nav-products">Sản Phẩm</span>
+            </button>
+            <button class="flex flex-col items-center py-2 px-4 text-gray-400">
+                <i class="fas fa-plus-circle text-xl"></i>
+                <span class="editable text-xs mt-1" data-key="mobile-nav-add">Thêm</span>
+            </button>
+            <button class="flex flex-col items-center py-2 px-4 text-gray-400">
+                <i class="fas fa-user text-xl"></i>
+                <span class="editable text-xs mt-1" data-key="mobile-nav-profile">Hồ Sơ</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-20 md:pb-6">
+        
+        <!-- Search Section -->
+        <div class="mb-6">
+            <div class="relative">
+                <input type="text" id="searchInput" placeholder="Tìm kiếm nhà cung cấp hoặc sản phẩm..." class="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <i class="fas fa-search text-gray-400"></i>
+                </div>
+            </div>
+        </div>
+
+
+        <!-- Main Layout -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            
+            <!-- Left Column - Suppliers -->
+            <div class="space-y-6">
+                <div class="flex justify-between items-center">
+                    <h2 class="editable text-2xl font-bold text-gray-900" data-key="suppliers-title">Danh Sách Nhà Cung Cấp</h2>
+                </div>
+
+                <div id="suppliersList" class="space-y-4">
+                    <!-- Supplier 1: Haining Siqi Textile -->
+                    <div class="supplier-card bg-white rounded-xl p-6 shadow-sm border hover:shadow-md transition cursor-pointer relative" data-supplier-id="1" onclick="openMediaGallery(1)">
+                        <div class="flex items-start justify-between">
+                            <div class="flex items-start space-x-4">
+                                <div class="bg-gradient-to-r from-blue-500 to-purple-600 p-3 rounded-full">
+                                    <i class="fas fa-industry text-white text-lg"></i>
+                                </div>
+                                <div class="flex-1">
+                                    <h3 class="editable text-lg font-semibold text-gray-900" data-key="supplier1-name">Haining Siqi Textile Co.,Ltd.</h3>
+                                    <p class="editable text-sm text-gray-500 mb-2" data-key="supplier1-category">Ncc Voan, đã lấy mẫu</p>
+                                    <div class="text-sm text-gray-600 mb-2">
+                                        <p><i class="fas fa-user text-gray-400 mr-1"></i> Liên hệ: Tina Song</p>
+                                        <p><i class="fas fa-map-marker-alt text-gray-400 mr-1"></i> Dongfeng 100 Tuanjiecun Xucun, Haining Zhejiang China 314409</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="flex flex-col space-y-2">
+                                <button onclick="event.stopPropagation(); openWeChat('syt0206')" class="p-2 text-green-600 hover:bg-green-50 rounded-lg transition text-xs font-medium">
+                                    <i class="fab fa-weixin mr-1"></i>WeChat
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Supplier 2: 中艺遮阳 -->
+                    <div class="supplier-card bg-white rounded-xl p-6 shadow-sm border hover:shadow-md transition cursor-pointer relative" data-supplier-id="2" onclick="openMediaGallery(2)">
+                        <div class="flex items-start justify-between">
+                            <div class="flex items-start space-x-4">
+                                <div class="bg-gradient-to-r from-green-500 to-teal-600 p-3 rounded-full">
+                                    <i class="fas fa-umbrella text-white text-lg"></i>
+                                </div>
+                                <div class="flex-1">
+                                    <h3 class="editable text-lg font-semibold text-gray-900" data-key="supplier2-name">中艺遮阳</h3>
+                                    <p class="editable text-sm text-gray-500 mb-2" data-key="supplier2-category">Che Nắng & Ô Dù</p>
+                                </div>
+                            </div>
+                            <div class="flex flex-col space-y-2">
+                                <button onclick="event.stopPropagation(); openWeChat('psZYCS')" class="p-2 text-green-600 hover:bg-green-50 rounded-lg transition text-xs font-medium">
+                                    <i class="fab fa-weixin mr-1"></i>WeChat
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Supplier 3: 品红总经理助理 -->
+                    <div class="supplier-card bg-white rounded-xl p-6 shadow-sm border hover:shadow-md transition cursor-pointer relative" data-supplier-id="3" onclick="openMediaGallery(3)">
+                        <div class="flex items-start justify-between">
+                            <div class="flex items-start space-x-4">
+                                <div class="bg-gradient-to-r from-red-500 to-pink-600 p-3 rounded-full">
+                                    <i class="fas fa-briefcase text-white text-lg"></i>
+                                </div>
+                                <div class="flex-1">
+                                    <h3 class="editable text-lg font-semibold text-gray-900" data-key="supplier3-name">品红总经理助理</h3>
+                                    <p class="editable text-sm text-gray-500 mb-2" data-key="supplier3-category">Tổng Hợp</p>
+                                    <div class="text-sm text-gray-600 mb-2">
+                                        <p><i class="fas fa-user text-gray-400 mr-1"></i> Liên hệ: Cao / Tang</p>
+                                        <p><i class="fas fa-map-marker-alt text-gray-400 mr-1"></i> Xinfeng Park, đường Biaojia, đường Keyan, quận Keqiao, Shaoxing, Chiết Giang</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="flex flex-col space-y-2">
+                                <button onclick="event.stopPropagation(); openWeChat('phqh2017')" class="p-2 text-green-600 hover:bg-green-50 rounded-lg transition text-xs font-medium">
+                                    <i class="fab fa-weixin mr-1"></i>WeChat
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Supplier 4: 难得糊涂 -->
+                    <div class="supplier-card bg-white rounded-xl p-6 shadow-sm border hover:shadow-md transition cursor-pointer relative" data-supplier-id="4" onclick="openMediaGallery(4)">
+                        <div class="flex items-start justify-between">
+                            <div class="flex items-start space-x-4">
+                                <div class="bg-gradient-to-r from-purple-500 to-indigo-600 p-3 rounded-full">
+                                    <i class="fas fa-store text-white text-lg"></i>
+                                </div>
+                                <div class="flex-1">
+                                    <h3 class="editable text-lg font-semibold text-gray-900" data-key="supplier4-name">难得糊涂</h3>
+                                    <p class="editable text-sm text-gray-500 mb-2" data-key="supplier4-category">Tổng Hợp</p>
+                                </div>
+                            </div>
+                            <div class="flex flex-col space-y-2">
+                                <button onclick="event.stopPropagation(); openWeChat('sjw0901w7')" class="p-2 text-green-600 hover:bg-green-50 rounded-lg transition text-xs font-medium">
+                                    <i class="fab fa-weixin mr-1"></i>WeChat
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Supplier 5: Michael -->
+                    <div class="supplier-card bg-white rounded-xl p-6 shadow-sm border hover:shadow-md transition cursor-pointer relative" data-supplier-id="5" onclick="openMediaGallery(5)">
+                        <div class="flex items-start justify-between">
+                            <div class="flex items-start space-x-4">
+                                <div class="bg-gradient-to-r from-orange-500 to-red-600 p-3 rounded-full">
+                                    <i class="fas fa-user-tie text-white text-lg"></i>
+                                </div>
+                                <div class="flex-1">
+                                    <h3 class="editable text-lg font-semibold text-gray-900" data-key="supplier5-name">Michael</h3>
+                                    <p class="editable text-sm text-gray-500 mb-2" data-key="supplier5-category">Tổng Hợp</p>
+                                </div>
+                            </div>
+                            <div class="flex flex-col space-y-2">
+                                <button onclick="event.stopPropagation(); openWeChat('michael859')" class="p-2 text-green-600 hover:bg-green-50 rounded-lg transition text-xs font-medium">
+                                    <i class="fab fa-weixin mr-1"></i>WeChat
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Column - Products -->
+            <div class="space-y-6">
+
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Settings Panel -->
+    <div id="settingsPanel" class="slide-panel fixed top-0 right-0 h-full w-80 bg-white shadow-xl z-50 overflow-y-auto no-print">
+        <div class="p-6">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="editable text-lg font-semibold" data-key="settings-title">Cài Đặt & Xuất Dữ Liệu</h3>
+                <button id="closeSettings" class="p-2 hover:bg-gray-100 rounded-lg">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <div class="space-y-6">
+                <!-- Text Settings -->
+                <div>
+                    <h4 class="editable font-medium mb-3" data-key="text-settings-title">Tùy Chỉnh Văn Bản</h4>
+                    <button id="exportTexts" class="editable w-full bg-blue-500 text-white py-2 px-4 rounded-lg hover:bg-blue-600 transition mb-2" data-key="export-texts-btn">Xuất Cài Đặt Văn Bản</button>
+                    <label class="editable block mb-2 text-sm font-medium" data-key="import-texts-label">Nhập Cài Đặt Văn Bản:</label>
+                    <input type="file" id="importTexts" accept=".json" class="w-full p-2 border rounded-lg">
+                </div>
+
+                <!-- Supabase Configuration -->
+                <div>
+                    <h4 class="editable font-medium mb-3" data-key="supabase-title">Cấu Hình Supabase</h4>
+                    <div class="space-y-3">
+                        <div>
+                            <label class="block text-sm font-medium mb-1">Supabase URL:</label>
+                            <input type="url" id="supabaseUrl" placeholder="https://xxx.supabase.co" class="w-full p-2 border rounded-lg text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-1">Anon Key:</label>
+                            <input type="password" id="supabaseKey" placeholder="eyJhbGciOiJIUzI1NiIs..." class="w-full p-2 border rounded-lg text-sm">
+                        </div>
+                        <button id="connectSupabase" class="w-full bg-green-500 text-white py-2 px-4 rounded-lg hover:bg-green-600 transition text-sm">
+                            <i class="fas fa-plug mr-2"></i>Kết Nối Supabase
+                        </button>
+                        <button id="syncToSupabase" class="w-full bg-blue-500 text-white py-2 px-4 rounded-lg hover:bg-blue-600 transition text-sm" disabled>
+                            <i class="fas fa-sync mr-2"></i>Đồng Bộ Dữ Liệu
+                        </button>
+                        <button id="uploadAllMedia" class="w-full bg-purple-500 text-white py-2 px-4 rounded-lg hover:bg-purple-600 transition text-sm" disabled>
+                            <i class="fas fa-cloud-upload-alt mr-2"></i>Upload Tất Cả Ảnh
+                        </button>
+                        <div id="supabaseStatus" class="text-sm text-gray-500">
+                            <i class="fas fa-circle text-red-500 mr-1"></i>Chưa kết nối
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Reset Options -->
+                <div>
+                    <h4 class="editable font-medium mb-3" data-key="reset-title">Tuỳ Chọn Đặt Lại</h4>
+                    <button id="resetTexts" class="editable w-full bg-gray-500 text-white py-2 px-4 rounded-lg hover:bg-gray-600 transition" data-key="reset-texts-btn">Đặt Lại Tất Cả Văn Bản</button>
+                </div>
+
+                <!-- App Info -->
+                <div class="border-t pt-6">
+                    <h4 class="editable font-medium mb-3" data-key="app-info-title">Thông Tin Ứng Dụng</h4>
+                    <div class="text-sm text-gray-600 space-y-2">
+                        <p><span class="editable font-medium" data-key="version-label">Phiên Bản:</span> 1.0.0</p>
+                        <p><span class="editable font-medium" data-key="last-updated-label">Cập Nhật Cuối:</span> <span id="lastUpdated">-</span></p>
+                        <p><span class="editable font-medium" data-key="total-edits-label">Tổng Số Chỉnh Sửa:</span> <span id="totalEdits">0</span></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification -->
+    <div id="notification" class="notification">
+        <span id="notificationText"></span>
+    </div>
+
+    <!-- Supplier Edit Modal -->
+    <div id="supplierEditModal" class="modal">
+        <div class="modal-content">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-xl font-bold text-gray-900">Chỉnh Sửa Nhà Cung Cấp</h2>
+                <button onclick="closeSupplierEditModal()" class="text-gray-400 hover:text-gray-600 text-2xl">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <form id="supplierEditForm" class="form-grid">
+                <div class="form-field">
+                    <label for="supplierName">Tên nhà cung cấp *</label>
+                    <input type="text" id="supplierName" name="name" required>
+                </div>
+                
+                <div class="form-field">
+                    <label for="supplierCompany">Tên công ty *</label>
+                    <input type="text" id="supplierCompany" name="company" required>
+                </div>
+                
+                <div class="form-field">
+                    <label for="supplierCategory">Danh mục *</label>
+                    <select id="supplierCategory" name="category" required>
+                        <option value="">Chọn danh mục</option>
+                        <option value="textile">Dệt May & Vải</option>
+                        <option value="umbrella">Che Nắng & Ô Dù</option>
+                        <option value="general">Tổng Hợp</option>
+                        <option value="fashion">Thời Trang & May Mặc</option>
+                        <option value="electronics">Điện Tử & Thiết Bị</option>
+                        <option value="home">Gia Đình & Đời Sống</option>
+                        <option value="beauty">Làm Đẹp & Sức Khỏe</option>
+                        <option value="sports">Thể Thao & Giải Trí</option>
+                    </select>
+                </div>
+                
+                <div class="form-field">
+                    <label for="contactPerson">Người liên hệ</label>
+                    <input type="text" id="contactPerson" name="contact_person" placeholder="Tên người liên hệ">
+                </div>
+                
+                <div class="form-field">
+                    <label for="supplierWechat">WeChat ID *</label>
+                    <input type="text" id="supplierWechat" name="wechat" required>
+                </div>
+                
+                <div class="form-field">
+                    <label for="supplierPhone">Số điện thoại *</label>
+                    <input type="tel" id="supplierPhone" name="phone" required>
+                </div>
+                
+                <div class="form-field">
+                    <label for="supplierEmail">Email</label>
+                    <input type="email" id="supplierEmail" name="email">
+                </div>
+                
+                <div class="form-field full-width">
+                    <label for="supplierAddress">Địa chỉ</label>
+                    <textarea id="supplierAddress" name="address" rows="2" placeholder="Địa chỉ chi tiết của nhà cung cấp"></textarea>
+                </div>
+                
+                <div class="form-field">
+                    <label for="contactStatus">Trạng thái liên hệ</label>
+                    <select id="contactStatus" name="status">
+                        <option value="not-contacted">📋 Chưa liên hệ</option>
+                        <option value="contacted">📞 Đã liên hệ</option>
+                        <option value="negotiating">🤝 Đang đàm phán</option>
+                        <option value="completed">✅ Hoàn thành</option>
+                        <option value="cancelled">❌ Hủy bỏ</option>
+                    </select>
+                </div>
+                
+                <div class="form-field">
+                    <label for="priority">Độ ưu tiên</label>
+                    <select id="priority" name="priority">
+                        <option value="low">Thấp</option>
+                        <option value="medium">Trung bình</option>
+                        <option value="high">Cao</option>
+                        <option value="urgent">Khẩn cấp</option>
+                    </select>
+                </div>
+                
+                <div class="form-field full-width">
+                    <label for="contactNotes">Ghi chú liên hệ</label>
+                    <textarea id="contactNotes" name="notes" rows="3" placeholder="Ghi chú về các cuộc liên hệ, đàm phán..."></textarea>
+                </div>
+                
+                <div class="form-field full-width">
+                    <label for="internalNotes">Ghi chú nội bộ</label>
+                    <textarea id="internalNotes" name="internal_notes" rows="2" placeholder="Ghi chú riêng cho nội bộ"></textarea>
+                </div>
+            </form>
+            
+            <div class="flex gap-3 mt-6">
+                <button type="button" onclick="saveSupplier()" class="flex-1 bg-blue-500 text-white py-2 px-4 rounded-lg hover:bg-blue-600 transition">
+                    <i class="fas fa-save mr-2"></i>Lưu thay đổi
+                </button>
+                <button type="button" onclick="closeSupplierEditModal()" class="bg-gray-500 text-white py-2 px-4 rounded-lg hover:bg-gray-600 transition">
+                    Hủy
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Product Edit Modal -->
+    <div id="productEditModal" class="modal">
+        <div class="modal-content">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-xl font-bold text-gray-900">Chỉnh Sửa Sản Phẩm</h2>
+                <button onclick="closeProductEditModal()" class="text-gray-400 hover:text-gray-600 text-2xl">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <form id="productEditForm" class="form-grid">
+                <div class="form-field full-width">
+                    <label for="productName">Tên sản phẩm *</label>
+                    <input type="text" id="productName" name="name" required>
+                </div>
+                
+                <div class="form-field">
+                    <label for="productCategory">Danh mục *</label>
+                    <select id="productCategory" name="category" required>
+                        <option value="">Chọn danh mục</option>
+                        <option value="fashion">Thời Trang</option>
+                        <option value="electronics">Điện Tử</option>
+                        <option value="home">Gia Đình</option>
+                        <option value="beauty">Làm Đẹp</option>
+                        <option value="sports">Thể Thao</option>
+                    </select>
+                </div>
+                
+                <div class="form-field">
+                    <label for="productPrice">Giá bán *</label>
+                    <input type="text" id="productPrice" name="price" required placeholder="VD: $12-18">
+                </div>
+                
+                <div class="form-field">
+                    <label for="productSupplier">Nhà cung cấp</label>
+                    <select id="productSupplier" name="supplier">
+                        <option value="">Chọn nhà cung cấp</option>
+                        <option value="1">Công Ty Thời Trang Quảng Châu</option>
+                        <option value="2">Trung Tâm Điện Tử Thâm Quyến</option>
+                        <option value="3">Trang Trí Nội Thất Thượng Hải</option>
+                    </select>
+                </div>
+                
+                <div class="form-field">
+                    <label for="productStock">Tình trạng kho</label>
+                    <select id="productStock" name="stock">
+                        <option value="available">✅ Có sẵn</option>
+                        <option value="limited">⚠️ Hạn chế</option>
+                        <option value="out-of-stock">❌ Hết hàng</option>
+                        <option value="pre-order">📋 Đặt trước</option>
+                    </select>
+                </div>
+                
+                <div class="form-field full-width">
+                    <label for="productDescription">Mô tả sản phẩm</label>
+                    <textarea id="productDescription" name="description" rows="3" placeholder="Mô tả chi tiết về sản phẩm..."></textarea>
+                </div>
+                
+                <div class="form-field full-width">
+                    <label for="productNotes">Ghi chú nội bộ</label>
+                    <textarea id="productNotes" name="notes" rows="2" placeholder="Ghi chú riêng về sản phẩm này..."></textarea>
+                </div>
+            </form>
+            
+            <div class="flex gap-3 mt-6">
+                <button type="button" onclick="saveProduct()" class="flex-1 bg-blue-500 text-white py-2 px-4 rounded-lg hover:bg-blue-600 transition">
+                    <i class="fas fa-save mr-2"></i>Lưu thay đổi
+                </button>
+                <button type="button" onclick="closeProductEditModal()" class="bg-gray-500 text-white py-2 px-4 rounded-lg hover:bg-gray-600 transition">
+                    Hủy
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Media Gallery -->
+    <div id="mediaGallery" class="media-gallery">
+        <div class="gallery-content">
+            <div class="gallery-header">
+                <h2 class="gallery-title" id="galleryTitle">
+                    <i class="fas fa-images"></i>
+                    Hình ảnh sản phẩm
+                </h2>
+                <button class="gallery-close" onclick="closeMediaGallery()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="gallery-body">
+                <div class="upload-area" onclick="triggerFileUpload()" ondrop="handleDrop(event)" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)">
+                    <input type="file" id="mediaUpload" multiple accept="image/*,video/*" onchange="handleFileUpload(event)">
+                    <div class="upload-icon">
+                        <i class="fas fa-cloud-upload-alt"></i>
+                    </div>
+                    <h3 style="margin-bottom: 0.5rem; font-weight: 600;">Tải lên hình ảnh hoặc video</h3>
+                    <p style="color: #6b7280; margin-bottom: 1rem;">Kéo thả file vào đây hoặc click để chọn</p>
+                    <p style="color: #9ca3af; font-size: 0.875rem;">Hỗ trợ: JPG, PNG, GIF, MP4, MOV</p>
+                    <div id="uploadStorageInfo" style="margin-top: 1rem; padding: 0.75rem; background: #f1f5f9; border-radius: 8px; font-size: 0.875rem;">
+                        <i class="fas fa-info-circle text-blue-500 mr-1"></i>
+                        <span id="storageStatus">Ảnh sẽ được lưu cục bộ</span>
+                    </div>
+                </div>
+                
+                <div id="mediaGrid" class="media-grid">
+                    <!-- Media items will be populated here -->
+                </div>
+                
+                <div id="emptyGallery" class="empty-gallery">
+                    <i class="fas fa-images"></i>
+                    <h3>Chưa có hình ảnh</h3>
+                    <p>Upload hình ảnh hoặc video để bắt đầu</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Fullscreen Viewer -->
+    <div id="fullscreenViewer" class="fullscreen-viewer">
+        <div class="fullscreen-content">
+            <button class="fullscreen-close" onclick="closeFullscreenViewer()">
+                <i class="fas fa-times"></i>
+            </button>
+            <div id="fullscreenMedia"></div>
+        </div>
+    </div>
+
+    <script>
+        // Supabase Configuration
+        const SUPABASE_URL = 'YOUR_SUPABASE_URL'; // Replace with your Supabase URL
+        const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY'; // Replace with your Supabase anon key
+        
+        let supabase;
+        let isSupabaseConnected = false;
+        
+        // Initialize Supabase
+        function initSupabase() {
+            try {
+                if (SUPABASE_URL !== 'YOUR_SUPABASE_URL' && SUPABASE_ANON_KEY !== 'YOUR_SUPABASE_ANON_KEY') {
+                    supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+                    isSupabaseConnected = true;
+                    console.log('Supabase connected successfully');
+                    // Auto-sync data on load
+                    syncAllDataToSupabase();
+                } else {
+                    console.log('Supabase not configured. Using localStorage only.');
+                }
+            } catch (error) {
+                console.error('Error initializing Supabase:', error);
+                showNotification('Lỗi kết nối Supabase: ' + error.message, 'error');
+            }
+        }
+        
+        // Sync functions
+        async function syncSuppliersToSupabase() {
+            if (!isSupabaseConnected) return;
+            
+            try {
+                // Upload suppliers data
+                const { error } = await supabase
+                    .from('suppliers')
+                    .upsert(Object.entries(suppliersData).map(([id, data]) => ({
+                        id: parseInt(id),
+                        ...data,
+                        updated_at: new Date().toISOString()
+                    })));
+                
+                if (error) throw error;
+                console.log('Suppliers synced to Supabase');
+            } catch (error) {
+                console.error('Error syncing suppliers:', error);
+                showNotification('Lỗi đồng bộ nhà cung cấp: ' + error.message, 'error');
+            }
+        }
+        
+        async function uploadSingleMediaToSupabase(supplierId, mediaItem) {
+            if (!isSupabaseConnected) return null;
+            
+            try {
+                showNotification('Đang upload ảnh lên Supabase...', 'info');
+                
+                // Convert base64 to blob
+                const response = await fetch(mediaItem.url);
+                const blob = await response.blob();
+                
+                // Create unique filename
+                const fileExtension = mediaItem.name.split('.').pop() || 'jpg';
+                const fileName = `supplier_${supplierId}/${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${fileExtension}`;
+                
+                // Upload to Supabase Storage
+                const { data, error } = await supabase.storage
+                    .from('supplier-media')
+                    .upload(fileName, blob, {
+                        cacheControl: '3600',
+                        upsert: false
+                    });
+                
+                if (error) {
+                    console.error('Storage upload error:', error);
+                    throw error;
+                }
+                
+                // Get public URL
+                const { data: publicData } = supabase.storage
+                    .from('supplier-media')
+                    .getPublicUrl(fileName);
+                
+                // Update media item with Supabase info
+                mediaItem.supabase_url = publicData.publicUrl;
+                mediaItem.supabase_path = fileName;
+                mediaItem.uploaded_to_supabase = true;
+                
+                console.log('Media uploaded to Supabase:', fileName);
+                showNotification('Upload ảnh thành công!', 'success');
+                
+                return mediaItem;
+                
+            } catch (error) {
+                console.error('Error uploading media:', error);
+                showNotification('Lỗi upload ảnh: ' + error.message, 'error');
+                return null;
+            }
+        }
+        
+        async function syncMediaToSupabase(supplierId, mediaItems) {
+            if (!isSupabaseConnected) return;
+            
+            try {
+                const uploadedItems = [];
+                
+                // Upload each media item that hasn't been uploaded yet
+                for (const mediaItem of mediaItems) {
+                    if (mediaItem.url.startsWith('data:') && !mediaItem.uploaded_to_supabase) {
+                        const uploadedItem = await uploadSingleMediaToSupabase(supplierId, mediaItem);
+                        if (uploadedItem) {
+                            uploadedItems.push(uploadedItem);
+                        }
+                    } else {
+                        uploadedItems.push(mediaItem);
+                    }
+                }
+                
+                // Save all media metadata to database
+                const { error } = await supabase
+                    .from('supplier_media')
+                    .upsert({
+                        supplier_id: parseInt(supplierId),
+                        media_items: supplierMedia[supplierId],
+                        updated_at: new Date().toISOString()
+                    });
+                
+                if (error) throw error;
+                
+                console.log('Media metadata synced to database for supplier', supplierId);
+                
+            } catch (error) {
+                console.error('Error syncing media:', error);
+                showNotification('Lỗi đồng bộ metadata: ' + error.message, 'error');
+            }
+        }
+        
+        async function uploadAllLocalMediaToSupabase() {
+            if (!isSupabaseConnected) return;
+            
+            showNotification('Đang upload tất cả ảnh local lên Supabase...', 'info');
+            
+            try {
+                let uploadCount = 0;
+                let totalCount = 0;
+                
+                // Count total media items that need upload
+                for (const [supplierId, mediaItems] of Object.entries(supplierMedia)) {
+                    for (const item of mediaItems) {
+                        if (item.url.startsWith('data:') && !item.uploaded_to_supabase) {
+                            totalCount++;
+                        }
+                    }
+                }
+                
+                if (totalCount === 0) {
+                    showNotification('Tất cả ảnh đã được upload lên cloud!', 'success');
+                    return;
+                }
+                
+                // Upload all local media
+                for (const [supplierId, mediaItems] of Object.entries(supplierMedia)) {
+                    for (const item of mediaItems) {
+                        if (item.url.startsWith('data:') && !item.uploaded_to_supabase) {
+                            const uploadedItem = await uploadSingleMediaToSupabase(supplierId, item);
+                            if (uploadedItem) {
+                                uploadCount++;
+                                showNotification(`Upload thành công ${uploadCount}/${totalCount} ảnh`, 'info');
+                            }
+                        }
+                    }
+                    
+                    // Sync metadata after uploading all items for this supplier
+                    await syncMediaToSupabase(supplierId, mediaItems);
+                }
+                
+                // Update local storage
+                saveMediaToStorage();
+                
+                // Refresh current gallery if open
+                if (currentSupplierId) {
+                    renderMediaGrid();
+                }
+                
+                showNotification(`Hoàn thành! Đã upload ${uploadCount}/${totalCount} ảnh lên Supabase`, 'success');
+                
+            } catch (error) {
+                console.error('Error uploading all media:', error);
+                showNotification('Lỗi upload ảnh: ' + error.message, 'error');
+            }
+        }
+        
+        async function syncAllDataToSupabase() {
+            if (!isSupabaseConnected) return;
+            
+            showNotification('Đang đồng bộ dữ liệu lên Supabase...', 'info');
+            
+            try {
+                // Sync suppliers
+                await syncSuppliersToSupabase();
+                
+                // Sync media for all suppliers
+                for (const [supplierId, mediaItems] of Object.entries(supplierMedia)) {
+                    if (mediaItems.length > 0) {
+                        await syncMediaToSupabase(parseInt(supplierId), mediaItems);
+                    }
+                }
+                
+                showNotification('Đồng bộ dữ liệu thành công!', 'success');
+            } catch (error) {
+                console.error('Error syncing all data:', error);
+                showNotification('Lỗi đồng bộ dữ liệu: ' + error.message, 'error');
+            }
+        }
+        
+        async function loadDataFromSupabase() {
+            if (!isSupabaseConnected) return;
+            
+            try {
+                // Load suppliers
+                const { data: suppliers, error: suppliersError } = await supabase
+                    .from('suppliers')
+                    .select('*');
+                
+                if (suppliersError) throw suppliersError;
+                
+                if (suppliers && suppliers.length > 0) {
+                    const supabaseData = {};
+                    suppliers.forEach(supplier => {
+                        const { id, updated_at, ...supplierData } = supplier;
+                        supabaseData[id] = supplierData;
+                    });
+                    
+                    // Merge with local data (keep most recent)
+                    suppliersData = { ...suppliersData, ...supabaseData };
+                    saveDataToStorage();
+                    
+                    // Update UI
+                    Object.keys(supabaseData).forEach(id => updateSupplierCard(id));
+                }
+                
+                // Load media
+                const { data: mediaData, error: mediaError } = await supabase
+                    .from('supplier_media')
+                    .select('*');
+                
+                if (mediaError) throw mediaError;
+                
+                if (mediaData && mediaData.length > 0) {
+                    mediaData.forEach(item => {
+                        supplierMedia[item.supplier_id] = item.media_items || [];
+                    });
+                    saveMediaToStorage();
+                }
+                
+                showNotification('Dữ liệu đã được tải từ Supabase', 'success');
+            } catch (error) {
+                console.error('Error loading data from Supabase:', error);
+                showNotification('Lỗi tải dữ liệu từ Supabase: ' + error.message, 'error');
+            }
+        }
+        
+        // Edit Mode functionality
+        let editModeActive = false;
+        let textSettings = {};
+        let totalEdits = 0;
+        
+        // Data storage
+        let suppliersData = {
+            1: {
+                name: "Haining Siqi Textile Co.,Ltd.",
+                company: "Haining Siqi Textile Co.,Ltd.",
+                category: "textile",
+                wechat: "syt0206",
+                phone: "",
+                email: "",
+                address: "Dongfeng 100 Tuanjiecun Xucun, Haining Zhejiang China 314409",
+                contact_person: "Tina Song",
+                status: "not-contacted",
+                priority: "medium",
+                notes: "Hình ảnh sản phẩm sẽ được cập nhật sau",
+                internal_notes: "Nhà cung cấp dệt may từ Hội chợ R&T"
+            },
+            2: {
+                name: "中艺遮阳",
+                company: "中艺遮阳",
+                category: "umbrella",
+                wechat: "psZYCS",
+                phone: "",
+                email: "",
+                address: "",
+                contact_person: "",
+                status: "not-contacted",
+                priority: "medium",
+                notes: "Nhà cung cấp sản phẩm che nắng",
+                internal_notes: "Cần tìm hiểu thêm về sản phẩm"
+            },
+            3: {
+                name: "品红总经理助理",
+                company: "Công ty cổ phần truyền thông văn hóa Shaoxing Shushia",
+                category: "general",
+                wechat: "phqh2017",
+                phone: "1595 850 2458 / 15325751655",
+                email: "",
+                address: "Xinfeng Park, đường Biaojia, đường Keyan, quận Keqiao, Shaoxing, Chiết Giang",
+                contact_person: "Cao / Tang",
+                status: "not-contacted",
+                priority: "medium",
+                notes: "Trợ lý tổng giám đốc - Công ty truyền thông văn hóa",
+                internal_notes: "Liên hệ: 1595 850 2458 (Cao) hoặc 15325751655 (Tang)"
+            },
+            4: {
+                name: "难得糊涂",
+                company: "难得糊涂",
+                category: "general",
+                wechat: "sjw0901w7",
+                phone: "",
+                email: "",
+                address: "",
+                contact_person: "",
+                status: "not-contacted",
+                priority: "medium",
+                notes: "Cần tìm hiểu thêm về sản phẩm",
+                internal_notes: "Tên công ty đặc biệt, cần tìm hiểu"
+            },
+            5: {
+                name: "Michael",
+                company: "Michael",
+                category: "general",
+                wechat: "michael859",
+                phone: "",
+                email: "",
+                address: "",
+                contact_person: "Michael",
+                status: "contacted",
+                priority: "high",
+                notes: "Đã có liên hệ trên Xưởng Vinh Quang",
+                internal_notes: "Đã có mối quan hệ tốt"
+            }
+        };
+        
+        let productsData = {};
+        
+        // Media storage for suppliers
+        let supplierMedia = {
+            1: [],
+            2: [],
+            3: [],
+            4: [],
+            5: []
+        };
+        
+        let currentSupplierId = null;
+        
+        // Media Gallery Functions
+        function openMediaGallery(supplierId) {
+            console.log('Opening media gallery for supplier:', supplierId);
+            currentSupplierId = supplierId;
+            const supplier = suppliersData[supplierId];
+            const supplierName = supplier ? supplier.name : `Nhà cung cấp ${supplierId}`;
+            
+            document.getElementById('galleryTitle').innerHTML = `<i class="fas fa-images"></i>${supplierName} - Hình ảnh sản phẩm`;
+            
+            // Update storage status info
+            const storageStatus = document.getElementById('storageStatus');
+            if (isSupabaseConnected) {
+                storageStatus.innerHTML = '<i class="fas fa-cloud text-green-500 mr-1"></i>Ảnh sẽ được upload lên Supabase Cloud';
+                storageStatus.parentElement.style.background = '#dcfce7';
+            } else {
+                storageStatus.innerHTML = '<i class="fas fa-hdd text-gray-500 mr-1"></i>Ảnh sẽ được lưu cục bộ (Local)';
+                storageStatus.parentElement.style.background = '#f1f5f9';
+            }
+            
+            const gallery = document.getElementById('mediaGallery');
+            if (gallery) {
+                gallery.classList.add('active');
+                console.log('Gallery opened successfully');
+            } else {
+                console.error('Gallery element not found');
+            }
+            
+            renderMediaGrid();
+        }
+        
+        function closeMediaGallery() {
+            document.getElementById('mediaGallery').classList.remove('active');
+            currentSupplierId = null;
+        }
+        
+        function renderMediaGrid() {
+            const mediaGrid = document.getElementById('mediaGrid');
+            const emptyGallery = document.getElementById('emptyGallery');
+            const media = supplierMedia[currentSupplierId] || [];
+            
+            if (media.length === 0) {
+                mediaGrid.style.display = 'none';
+                emptyGallery.style.display = 'block';
+            } else {
+                mediaGrid.style.display = 'grid';
+                emptyGallery.style.display = 'none';
+                
+                mediaGrid.innerHTML = media.map((item, index) => {
+                    const isVideo = item.type.startsWith('video/');
+                    const imageUrl = item.supabase_url || item.url; // Use Supabase URL if available
+                    const uploadStatus = item.uploaded_to_supabase ? 
+                        '<div class="absolute top-2 right-2 bg-green-500 text-white text-xs px-2 py-1 rounded-full"><i class="fas fa-cloud-check mr-1"></i>Cloud</div>' : 
+                        '<div class="absolute top-2 right-2 bg-gray-500 text-white text-xs px-2 py-1 rounded-full"><i class="fas fa-hdd mr-1"></i>Local</div>';
+                    
+                    return `
+                        <div class="media-item relative" onclick="openFullscreenViewer(${index})">
+                            ${isVideo ? 
+                                `<video src="${imageUrl}" muted></video>
+                                 <div class="play-icon"><i class="fas fa-play"></i></div>` :
+                                `<img src="${imageUrl}" alt="Product Image">`
+                            }
+                            ${uploadStatus}
+                        </div>
+                    `;
+                }).join('');
+            }
+        }
+        
+        function triggerFileUpload() {
+            document.getElementById('mediaUpload').click();
+        }
+        
+        function handleFileUpload(event) {
+            const files = event.target.files;
+            handleFiles(files);
+        }
+        
+        function handleDrop(event) {
+            event.preventDefault();
+            event.stopPropagation();
+            
+            const uploadArea = event.currentTarget;
+            uploadArea.classList.remove('dragover');
+            
+            const files = event.dataTransfer.files;
+            handleFiles(files);
+        }
+        
+        function handleDragOver(event) {
+            event.preventDefault();
+            event.stopPropagation();
+            event.currentTarget.classList.add('dragover');
+        }
+        
+        function handleDragLeave(event) {
+            event.preventDefault();
+            event.stopPropagation();
+            event.currentTarget.classList.remove('dragover');
+        }
+        
+        function handleFiles(files) {
+            if (!currentSupplierId) return;
+            
+            Array.from(files).forEach(file => {
+                if (file.type.startsWith('image/') || file.type.startsWith('video/')) {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        const mediaItem = {
+                            url: e.target.result,
+                            type: file.type,
+                            name: file.name,
+                            timestamp: Date.now()
+                        };
+                        
+                        if (!supplierMedia[currentSupplierId]) {
+                            supplierMedia[currentSupplierId] = [];
+                        }
+                        
+                        supplierMedia[currentSupplierId].push(mediaItem);
+                        saveMediaToStorage();
+                        renderMediaGrid();
+                        showNotification(`Đã tải lên ${file.name} thành công!`);
+                        
+                        // Auto-upload to Supabase immediately
+                        if (isSupabaseConnected) {
+                            uploadSingleMediaToSupabase(currentSupplierId, mediaItem).then(uploadedItem => {
+                                if (uploadedItem) {
+                                    // Update local storage with Supabase info
+                                    saveMediaToStorage();
+                                    // Sync metadata to database
+                                    syncMediaToSupabase(currentSupplierId, supplierMedia[currentSupplierId]);
+                                }
+                            });
+                        }
+                    };
+                    reader.readAsDataURL(file);
+                }
+            });
+        }
+        
+        function openFullscreenViewer(index) {
+            if (!currentSupplierId) return;
+            
+            const media = supplierMedia[currentSupplierId];
+            if (!media || !media[index]) return;
+            
+            const item = media[index];
+            const fullscreenMedia = document.getElementById('fullscreenMedia');
+            const isVideo = item.type.startsWith('video/');
+            const mediaUrl = item.supabase_url || item.url; // Use Supabase URL if available
+            
+            if (isVideo) {
+                fullscreenMedia.innerHTML = `<video src="${mediaUrl}" controls autoplay style="max-width: 100%; max-height: 95vh;">`;
+            } else {
+                fullscreenMedia.innerHTML = `<img src="${mediaUrl}" alt="Product Image" style="max-width: 100%; max-height: 95vh; object-fit: contain;">`;
+            }
+            
+            document.getElementById('fullscreenViewer').classList.add('active');
+        }
+        
+        function closeFullscreenViewer() {
+            document.getElementById('fullscreenViewer').classList.remove('active');
+            document.getElementById('fullscreenMedia').innerHTML = '';
+        }
+        
+        function saveMediaToStorage() {
+            localStorage.setItem('supplierMedia', JSON.stringify(supplierMedia));
+        }
+        
+        function loadMediaFromStorage() {
+            const saved = localStorage.getItem('supplierMedia');
+            if (saved) {
+                supplierMedia = JSON.parse(saved);
+            }
+        }
+        
+        // WeChat và Phone functions
+        function openWeChat(wechatId) {
+            // Thử mở app WeChat trước
+            const wechatAppUrl = `weixin://dl/chat?${wechatId}`;
+            const wechatWebUrl = `https://web.wechat.com/`;
+            
+            // Tạo một thử nghiệm để mở app
+            const iframe = document.createElement('iframe');
+            iframe.style.display = 'none';
+            iframe.src = wechatAppUrl;
+            document.body.appendChild(iframe);
+            
+            // Nếu không mở được app sau 2 giây, hiển thị thông báo
+            setTimeout(() => {
+                document.body.removeChild(iframe);
+                showNotification(`WeChat ID: ${wechatId} đã được sao chép vào clipboard. Vui lòng mở WeChat để tìm kiếm.`, 'success');
+                
+                // Sao chép WeChat ID vào clipboard
+                if (navigator.clipboard) {
+                    navigator.clipboard.writeText(wechatId).catch(err => {
+                        console.log('Không thể sao chép vào clipboard:', err);
+                    });
+                } else {
+                    // Fallback cho trình duyệt cũ
+                    const textArea = document.createElement('textarea');
+                    textArea.value = wechatId;
+                    document.body.appendChild(textArea);
+                    textArea.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(textArea);
+                }
+            }, 2000);
+        }
+        
+        function openPhone(phoneNumber) {
+            if (phoneNumber) {
+                window.location.href = `tel:${phoneNumber}`;
+            } else {
+                showNotification('Số điện thoại chưa được cập nhật', 'error');
+            }
+        }
+        
+        // Current editing IDs  
+        let currentProductId = null;
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            loadTextSettings();
+            updateEditIndicators();
+            updateLastUpdated();
+            loadSavedData();
+            loadMediaFromStorage();
+            
+            // Load Supabase credentials and initialize
+            loadSupabaseCredentials();
+            
+            // Load data from Supabase if available
+            setTimeout(() => {
+                if (isSupabaseConnected) {
+                    loadDataFromSupabase();
+                }
+            }, 1000);
+        });
+        
+        // Utility functions
+        function showNotification(message, type = 'success') {
+            const notification = document.getElementById('notification');
+            const notificationText = document.getElementById('notificationText');
+            
+            notificationText.textContent = message;
+            notification.className = `notification ${type}`;
+            notification.classList.add('show');
+            
+            setTimeout(() => {
+                notification.classList.remove('show');
+            }, 3000);
+        }
+        
+        function validateEmail(email) {
+            const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            return re.test(email);
+        }
+        
+        function validatePhone(phone) {
+            const re = /^[\+]?[\d\s\-\(\)]+$/;
+            return re.test(phone) && phone.length >= 10;
+        }
+        
+        // Supplier Modal Functions
+        function openSupplierEditModal(supplierId) {
+            currentSupplierId = supplierId;
+            const supplier = suppliersData[supplierId];
+            
+            if (!supplier) {
+                showNotification('Không tìm thấy thông tin nhà cung cấp', 'error');
+                return;
+            }
+            
+            // Populate form
+            document.getElementById('supplierName').value = supplier.name || '';
+            document.getElementById('supplierCompany').value = supplier.company || '';
+            document.getElementById('supplierCategory').value = supplier.category || '';
+            document.getElementById('contactPerson').value = supplier.contact_person || '';
+            document.getElementById('supplierWechat').value = supplier.wechat || '';
+            document.getElementById('supplierPhone').value = supplier.phone || '';
+            document.getElementById('supplierEmail').value = supplier.email || '';
+            document.getElementById('supplierAddress').value = supplier.address || '';
+            document.getElementById('contactStatus').value = supplier.status || 'not-contacted';
+            document.getElementById('priority').value = supplier.priority || 'medium';
+            document.getElementById('contactNotes').value = supplier.notes || '';
+            document.getElementById('internalNotes').value = supplier.internal_notes || '';
+            
+            // Show modal
+            document.getElementById('supplierEditModal').classList.add('active');
+        }
+        
+        function closeSupplierEditModal() {
+            document.getElementById('supplierEditModal').classList.remove('active');
+            currentSupplierId = null;
+        }
+        
+        function saveSupplier() {
+            if (!currentSupplierId) return;
+            
+            const form = document.getElementById('supplierEditForm');
+            const formData = new FormData(form);
+            
+            // Validation
+            const name = formData.get('name');
+            const company = formData.get('company');
+            const category = formData.get('category');
+            const wechat = formData.get('wechat');
+            const phone = formData.get('phone');
+            const email = formData.get('email');
+            
+            if (!name || !company || !category || !wechat || !phone) {
+                showNotification('Vui lòng điền đầy đủ thông tin bắt buộc', 'error');
+                return;
+            }
+            
+            if (!validatePhone(phone)) {
+                showNotification('Số điện thoại không hợp lệ', 'error');
+                return;
+            }
+            
+            if (email && !validateEmail(email)) {
+                showNotification('Email không hợp lệ', 'error');
+                return;
+            }
+            
+            // Update data
+            suppliersData[currentSupplierId] = {
+                name: formData.get('name'),
+                company: formData.get('company'),
+                category: formData.get('category'),
+                contact_person: formData.get('contact_person'),
+                wechat: formData.get('wechat'),
+                phone: formData.get('phone'),
+                email: formData.get('email'),
+                address: formData.get('address'),
+                status: formData.get('status'),
+                priority: formData.get('priority'),
+                notes: formData.get('notes'),
+                internal_notes: formData.get('internal_notes')
+            };
+            
+            // Update UI
+            updateSupplierCard(currentSupplierId);
+            saveDataToStorage();
+            closeSupplierEditModal();
+            showNotification('Đã lưu thông tin nhà cung cấp thành công!');
+            
+            totalEdits++;
+            updateTotalEdits();
+            updateLastUpdated();
+            
+            // Auto-sync to Supabase
+            if (isSupabaseConnected) {
+                syncSuppliersToSupabase();
+            }
+        }
+        
+        // Product Modal Functions
+        function openProductEditModal(productId) {
+            currentProductId = productId;
+            const product = productsData[productId];
+            
+            if (!product) {
+                showNotification('Không tìm thấy thông tin sản phẩm', 'error');
+                return;
+            }
+            
+            // Populate form
+            document.getElementById('productName').value = product.name || '';
+            document.getElementById('productCategory').value = product.category || '';
+            document.getElementById('productPrice').value = product.price || '';
+            document.getElementById('productSupplier').value = product.supplier || '';
+            document.getElementById('productStock').value = product.stock || 'available';
+            document.getElementById('productDescription').value = product.description || '';
+            document.getElementById('productNotes').value = product.notes || '';
+            
+            // Show modal
+            document.getElementById('productEditModal').classList.add('active');
+        }
+        
+        function closeProductEditModal() {
+            document.getElementById('productEditModal').classList.remove('active');
+            currentProductId = null;
+        }
+        
+        function saveProduct() {
+            if (!currentProductId) return;
+            
+            const form = document.getElementById('productEditForm');
+            const formData = new FormData(form);
+            
+            // Validation
+            const name = formData.get('name');
+            const category = formData.get('category');
+            const price = formData.get('price');
+            
+            if (!name || !category || !price) {
+                showNotification('Vui lòng điền đầy đủ thông tin bắt buộc', 'error');
+                return;
+            }
+            
+            // Update data
+            productsData[currentProductId] = {
+                name: formData.get('name'),
+                category: formData.get('category'),
+                price: formData.get('price'),
+                supplier: formData.get('supplier'),
+                stock: formData.get('stock'),
+                description: formData.get('description'),
+                notes: formData.get('notes')
+            };
+            
+            // Update UI
+            updateProductCard(currentProductId);
+            saveDataToStorage();
+            closeProductEditModal();
+            showNotification('Đã lưu thông tin sản phẩm thành công!');
+            
+            totalEdits++;
+            updateTotalEdits();
+            updateLastUpdated();
+        }
+        
+        // UI Update Functions
+        function updateSupplierCard(supplierId) {
+            const supplier = suppliersData[supplierId];
+            const card = document.querySelector(`[data-supplier-id="${supplierId}"]`);
+            
+            if (!card || !supplier) return;
+            
+            // Update name
+            const nameElement = card.querySelector(`[data-key="supplier${supplierId}-name"]`);
+            if (nameElement) nameElement.textContent = supplier.name;
+            
+            // Update category
+            const categoryElement = card.querySelector(`[data-key="supplier${supplierId}-category"]`);
+            if (categoryElement) {
+                const categoryMap = {
+                    'textile': 'Dệt May & Vải',
+                    'umbrella': 'Che Nắng & Ô Dù',
+                    'general': 'Tổng Hợp',
+                    'fashion': 'Thời Trang & May Mặc',
+                    'electronics': 'Điện Tử & Thiết Bị',
+                    'home': 'Gia Đình & Đời Sống',
+                    'beauty': 'Làm Đẹp & Sức Khỏe',
+                    'sports': 'Thể Thao & Giải Trí'
+                };
+                categoryElement.textContent = categoryMap[supplier.category] || supplier.category;
+            }
+            
+            // Update WeChat
+            const wechatElement = card.querySelector(`[data-key="supplier${supplierId}-wechat"]`);
+            if (wechatElement) wechatElement.textContent = supplier.wechat;
+            
+            // Update phone
+            const phoneElement = card.querySelector(`[data-key="supplier${supplierId}-phone"]`);
+            if (phoneElement) phoneElement.textContent = supplier.phone;
+            
+            // Update status badge
+            const statusBadge = card.querySelector('.status-badge');
+            if (statusBadge) {
+                const statusMap = {
+                    'not-contacted': { text: '📋 Chưa liên hệ', class: 'status-not-contacted' },
+                    'contacted': { text: '📞 Đã liên hệ', class: 'status-contacted' },
+                    'negotiating': { text: '🤝 Đang đàm phán', class: 'status-negotiating' },
+                    'completed': { text: '✅ Hoàn thành', class: 'status-completed' },
+                    'cancelled': { text: '❌ Hủy bỏ', class: 'status-cancelled' }
+                };
+                
+                const status = statusMap[supplier.status] || statusMap['not-contacted'];
+                statusBadge.textContent = status.text;
+                statusBadge.className = `status-badge ${status.class}`;
+                statusBadge.setAttribute('data-status', supplier.status);
+            }
+            
+            // Update priority
+            const priorityElement = card.querySelector('.text-xs.text-gray-500');
+            if (priorityElement && priorityElement.textContent.includes('Ưu tiên:')) {
+                const priorityMap = {
+                    'low': 'Thấp',
+                    'medium': 'Trung bình',
+                    'high': 'Cao',
+                    'urgent': 'Khẩn cấp'
+                };
+                priorityElement.textContent = `Ưu tiên: ${priorityMap[supplier.priority] || 'Trung bình'}`;
+            }
+            
+            // Update notes
+            const notesElement = card.querySelector('.text-xs.text-gray-600.italic');
+            if (notesElement) {
+                notesElement.textContent = `"${supplier.notes || 'Chưa có ghi chú'}"`;
+            }
+        }
+        
+        function updateProductCard(productId) {
+            const product = productsData[productId];
+            const card = document.querySelector(`[data-product-id="${productId}"]`);
+            
+            if (!card || !product) return;
+            
+            // Update name
+            const nameElement = card.querySelector(`[data-key="product${productId}-name"]`);
+            if (nameElement) nameElement.textContent = product.name;
+            
+            // Update price
+            const priceElement = card.querySelector(`[data-key="product${productId}-price"]`);
+            if (priceElement) priceElement.textContent = product.price;
+            
+            // Update description
+            const descElement = card.querySelector(`[data-key="product${productId}-desc"]`);
+            if (descElement) descElement.textContent = product.description;
+            
+            // Update category badge
+            const categoryBadge = card.querySelector(`[data-key="product${productId}-category"]`);
+            if (categoryBadge) {
+                const categoryMap = {
+                    'fashion': 'Thời Trang',
+                    'electronics': 'Điện Tử',
+                    'home': 'Gia Đình',
+                    'beauty': 'Làm Đẹp',
+                    'sports': 'Thể Thao'
+                };
+                categoryBadge.textContent = categoryMap[product.category] || product.category;
+            }
+        }
+        
+        // Data persistence
+        function saveDataToStorage() {
+            localStorage.setItem('suppliersData', JSON.stringify(suppliersData));
+            localStorage.setItem('productsData', JSON.stringify(productsData));
+        }
+        
+        function loadSavedData() {
+            const savedSuppliers = localStorage.getItem('suppliersData');
+            const savedProducts = localStorage.getItem('productsData');
+            
+            if (savedSuppliers) {
+                suppliersData = JSON.parse(savedSuppliers);
+                // Update UI for all suppliers
+                Object.keys(suppliersData).forEach(id => updateSupplierCard(id));
+            }
+            
+            if (savedProducts) {
+                productsData = JSON.parse(savedProducts);
+                // Update UI for all products
+                Object.keys(productsData).forEach(id => updateProductCard(id));
+            }
+        }
+        
+        // Close modals when clicking outside
+        document.addEventListener('click', function(e) {
+            if (e.target.classList.contains('modal')) {
+                if (e.target.id === 'supplierEditModal') {
+                    closeSupplierEditModal();
+                } else if (e.target.id === 'productEditModal') {
+                    closeProductEditModal();
+                }
+            }
+            
+            // Close media gallery when clicking outside
+            if (e.target.classList.contains('media-gallery')) {
+                closeMediaGallery();
+            }
+            
+            // Close fullscreen viewer when clicking outside
+            if (e.target.classList.contains('fullscreen-viewer')) {
+                closeFullscreenViewer();
+            }
+        });
+        
+        // Keyboard shortcuts
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                // Close fullscreen viewer first, then gallery
+                if (document.getElementById('fullscreenViewer').classList.contains('active')) {
+                    closeFullscreenViewer();
+                } else if (document.getElementById('mediaGallery').classList.contains('active')) {
+                    closeMediaGallery();
+                }
+            }
+        });
+
+        // Note: Edit mode toggle removed
+
+        function enableEditMode() {
+            document.querySelectorAll('.editable').forEach(element => {
+                element.contentEditable = true;
+                element.addEventListener('blur', handleTextEdit);
+                element.addEventListener('keydown', handleEnterKey);
+                
+                // Add edit indicator
+                if (!element.querySelector('.edit-indicator')) {
+                    const indicator = document.createElement('div');
+                    indicator.className = 'edit-indicator';
+                    indicator.innerHTML = '<i class="fas fa-pencil-alt"></i>';
+                    element.appendChild(indicator);
+                }
+            });
+
+            // Handle placeholder text
+            document.querySelectorAll('input[placeholder]').forEach(input => {
+                const placeholder = input.getAttribute('placeholder');
+                const key = 'placeholder-' + input.id;
+                if (textSettings[key]) {
+                    input.setAttribute('placeholder', textSettings[key]);
+                }
+                
+                input.addEventListener('focus', function() {
+                    if (editModeActive) {
+                        const newPlaceholder = prompt('Edit placeholder text:', this.getAttribute('placeholder'));
+                        if (newPlaceholder !== null) {
+                            this.setAttribute('placeholder', newPlaceholder);
+                            textSettings[key] = newPlaceholder;
+                            saveTextSettings();
+                            totalEdits++;
+                            updateTotalEdits();
+                        }
+                    }
+                });
+            });
+        }
+
+        function disableEditMode() {
+            document.querySelectorAll('.editable').forEach(element => {
+                element.contentEditable = false;
+                element.removeEventListener('blur', handleTextEdit);
+                element.removeEventListener('keydown', handleEnterKey);
+                
+                // Remove edit indicator
+                const indicator = element.querySelector('.edit-indicator');
+                if (indicator) {
+                    indicator.remove();
+                }
+            });
+        }
+
+        function handleTextEdit(event) {
+            const element = event.target;
+            const key = element.getAttribute('data-key');
+            const newText = element.innerText.trim();
+            
+            if (key) {
+                textSettings[key] = newText;
+                saveTextSettings();
+                totalEdits++;
+                updateTotalEdits();
+                updateLastUpdated();
+            }
+
+            // Special handling for page title
+            if (key === 'page-title' || element.id === 'page-title') {
+                document.title = newText;
+            }
+        }
+
+        function handleEnterKey(event) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                event.target.blur();
+            }
+        }
+
+        function updateEditIndicators() {
+            document.querySelectorAll('.editable').forEach(element => {
+                const key = element.getAttribute('data-key');
+                if (key && textSettings[key]) {
+                    element.innerText = textSettings[key];
+                }
+            });
+        }
+
+        // Text Settings Management
+        function saveTextSettings() {
+            localStorage.setItem('textSettings', JSON.stringify(textSettings));
+        }
+
+        function loadTextSettings() {
+            const saved = localStorage.getItem('textSettings');
+            if (saved) {
+                textSettings = JSON.parse(saved);
+                updateEditIndicators();
+            }
+            
+            const savedEdits = localStorage.getItem('totalEdits');
+            if (savedEdits) {
+                totalEdits = parseInt(savedEdits);
+                updateTotalEdits();
+            }
+        }
+
+        function updateTotalEdits() {
+            document.getElementById('totalEdits').textContent = totalEdits;
+            localStorage.setItem('totalEdits', totalEdits.toString());
+        }
+
+        function updateLastUpdated() {
+            const now = new Date().toLocaleString();
+            document.getElementById('lastUpdated').textContent = now;
+        }
+
+        // Export/Import functionality
+        document.getElementById('exportTexts').addEventListener('click', function() {
+            const dataStr = JSON.stringify(textSettings, null, 2);
+            const dataBlob = new Blob([dataStr], {type: 'application/json'});
+            const url = URL.createObjectURL(dataBlob);
+            
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = 'text-settings.json';
+            link.click();
+            
+            URL.revokeObjectURL(url);
+        });
+
+        document.getElementById('importTexts').addEventListener('change', function(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    try {
+                        const imported = JSON.parse(e.target.result);
+                        textSettings = {...textSettings, ...imported};
+                        saveTextSettings();
+                        updateEditIndicators();
+                        alert('Text settings imported successfully!');
+                    } catch (error) {
+                        alert('Error importing file: ' + error.message);
+                    }
+                };
+                reader.readAsText(file);
+            }
+        });
+
+        document.getElementById('resetTexts').addEventListener('click', function() {
+            if (confirm('Are you sure you want to reset all custom texts?')) {
+                textSettings = {};
+                totalEdits = 0;
+                saveTextSettings();
+                localStorage.removeItem('totalEdits');
+                location.reload();
+            }
+        });
+
+        // Settings Panel
+        document.getElementById('settingsBtn').addEventListener('click', function() {
+            document.getElementById('settingsPanel').classList.add('active');
+        });
+
+        document.getElementById('closeSettings').addEventListener('click', function() {
+            document.getElementById('settingsPanel').classList.remove('active');
+        });
+
+        // Search functionality
+        document.getElementById('searchInput').addEventListener('input', function() {
+            const query = this.value.toLowerCase();
+            
+            // Search suppliers
+            document.querySelectorAll('.supplier-card').forEach(card => {
+                const text = card.textContent.toLowerCase();
+                card.style.display = text.includes(query) ? 'block' : 'none';
+            });
+            
+            // Search products
+            document.querySelectorAll('.product-card').forEach(card => {
+                const text = card.textContent.toLowerCase();
+                card.style.display = text.includes(query) ? 'block' : 'none';
+            });
+        });
+
+        // Supplier selection
+        document.querySelectorAll('.supplier-card').forEach(card => {
+            card.addEventListener('click', function() {
+                const supplierId = this.getAttribute('data-supplier-id');
+                
+                // Remove active class from all cards
+                document.querySelectorAll('.supplier-card').forEach(c => c.classList.remove('ring-2', 'ring-blue-500'));
+                
+                // Add active class to clicked card
+                this.classList.add('ring-2', 'ring-blue-500');
+                
+                // Filter products by supplier (demo functionality)
+                filterProductsBySupplier(supplierId);
+            });
+        });
+
+        function filterProductsBySupplier(supplierId) {
+            // Demo implementation - in real app, you'd filter based on actual supplier data
+            const allProducts = document.querySelectorAll('.product-card');
+            allProducts.forEach((product, index) => {
+                // Show products based on supplier ID (demo logic)
+                if (supplierId === '1' && index < 2) {
+                    product.style.display = 'block';
+                } else if (supplierId === '2' && index >= 1 && index < 3) {
+                    product.style.display = 'block';
+                } else if (supplierId === '3' && index >= 2) {
+                    product.style.display = 'block';
+                } else {
+                    product.style.display = 'none';
+                }
+            });
+        }
+
+        // Mobile navigation
+        document.querySelectorAll('.md\\:hidden button').forEach(button => {
+            button.addEventListener('click', function() {
+                // Remove active class from all buttons
+                document.querySelectorAll('.md\\:hidden button').forEach(b => {
+                    b.classList.remove('text-blue-500');
+                    b.classList.add('text-gray-400');
+                });
+                
+                // Add active class to clicked button
+                this.classList.remove('text-gray-400');
+                this.classList.add('text-blue-500');
+            });
+        });
+
+        // Supabase Settings Event Handlers
+        document.getElementById('connectSupabase').addEventListener('click', function() {
+            const url = document.getElementById('supabaseUrl').value.trim();
+            const key = document.getElementById('supabaseKey').value.trim();
+            
+            if (!url || !key) {
+                showNotification('Vui lòng nhập đầy đủ URL và Anon Key', 'error');
+                return;
+            }
+            
+            try {
+                supabase = window.supabase.createClient(url, key);
+                isSupabaseConnected = true;
+                
+                // Save to localStorage
+                localStorage.setItem('supabaseUrl', url);
+                localStorage.setItem('supabaseKey', key);
+                
+                // Update UI
+                updateSupabaseStatus(true);
+                showNotification('Đã kết nối Supabase thành công!', 'success');
+                
+                // Auto-sync after connection
+                setTimeout(() => {
+                    syncAllDataToSupabase();
+                }, 1000);
+                
+            } catch (error) {
+                showNotification('Lỗi kết nối Supabase: ' + error.message, 'error');
+                updateSupabaseStatus(false);
+            }
+        });
+        
+        document.getElementById('syncToSupabase').addEventListener('click', function() {
+            if (isSupabaseConnected) {
+                syncAllDataToSupabase();
+            } else {
+                showNotification('Chưa kết nối Supabase', 'error');
+            }
+        });
+        
+        document.getElementById('uploadAllMedia').addEventListener('click', function() {
+            if (isSupabaseConnected) {
+                uploadAllLocalMediaToSupabase();
+            } else {
+                showNotification('Chưa kết nối Supabase', 'error');
+            }
+        });
+        
+        function updateSupabaseStatus(connected) {
+            const statusElement = document.getElementById('supabaseStatus');
+            const syncButton = document.getElementById('syncToSupabase');
+            const uploadButton = document.getElementById('uploadAllMedia');
+            
+            if (connected) {
+                statusElement.innerHTML = '<i class="fas fa-circle text-green-500 mr-1"></i>Đã kết nối';
+                
+                syncButton.disabled = false;
+                syncButton.classList.remove('bg-gray-400');
+                syncButton.classList.add('bg-blue-500', 'hover:bg-blue-600');
+                
+                uploadButton.disabled = false;
+                uploadButton.classList.remove('bg-gray-400');
+                uploadButton.classList.add('bg-purple-500', 'hover:bg-purple-600');
+            } else {
+                statusElement.innerHTML = '<i class="fas fa-circle text-red-500 mr-1"></i>Chưa kết nối';
+                
+                syncButton.disabled = true;
+                syncButton.classList.add('bg-gray-400');
+                syncButton.classList.remove('bg-blue-500', 'hover:bg-blue-600');
+                
+                uploadButton.disabled = true;
+                uploadButton.classList.add('bg-gray-400');
+                uploadButton.classList.remove('bg-purple-500', 'hover:bg-purple-600');
+            }
+        }
+        
+        // Load saved Supabase credentials
+        function loadSupabaseCredentials() {
+            const savedUrl = localStorage.getItem('supabaseUrl');
+            const savedKey = localStorage.getItem('supabaseKey');
+            
+            if (savedUrl && savedKey) {
+                document.getElementById('supabaseUrl').value = savedUrl;
+                document.getElementById('supabaseKey').value = savedKey;
+                
+                // Auto-connect if credentials exist
+                try {
+                    supabase = window.supabase.createClient(savedUrl, savedKey);
+                    isSupabaseConnected = true;
+                    updateSupabaseStatus(true);
+                    console.log('Auto-connected to Supabase using saved credentials');
+                } catch (error) {
+                    console.error('Failed to auto-connect to Supabase:', error);
+                    updateSupabaseStatus(false);
+                }
+            }
+        }
+
+        // Auto-save when page is about to be closed
+        window.addEventListener('beforeunload', function() {
+            saveTextSettings();
+        });
+    </script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"rayId":"971e2c739b86f4f8","serverTiming":{"name":{"cfExtPri":true,"cfEdge":true,"cfOrigin":true,"cfL4":true,"cfSpeedBrain":true,"cfCacheStatus":true}},"version":"2025.8.0","token":"4edd5f8ec12a48cfa682ab8261b80a79"}' crossorigin="anonymous"></script>
+</body>
+</html>
+    <script id="html_badge_script1">
+        window.__genspark_remove_badge_link = "https://www.genspark.ai/api/html_badge/" +
+            "remove_badge?token=To%2FBnjzloZ3UfQdcSaYfDo%2BvEnSppf27KctJ%2BFd1w0w7sUxRbsw9AOydj0TJDAOoZQj8tXoz0L%2FzbEEqKA4ClCNVrnDktzOlErZL%2BjQcMHD5NDazInJFgAExjnL3e1oot3Zv%2FhOxDWtaOAzSa8K0D8zKxPcUFWUZO5q7jgPUwWDG8mfKzO4rGfiWftKR%2Bi0hrBlyr1luGhjur1Q6C0ujyTnDrY%2BvRcU0hbA5kijY5tbNY6SRPyVYcBkaySv%2FDx%2FUGVfKsq8UWDCvlIApXYpIaPkWH9%2B%2FDqz7PCJSbHJx3GZev%2BSNCni2vQSWGc%2BNpqeJqdHX7gSZUJjjHhaEjKkqQyBZQE8eVF9Ap3mbIG1XbbgJslwjKPTsO8eeJ2AZtNLS4jK5HNdFME7VwCEHquCq6FpWxTFVyNAMZook6PaRRLIcBeeSzf56blW%2FhfUMy%2Bwyv6S%2BBom9ORc7EdgLl%2BEeRpThwB0H%2FgoyJCqRZCwvc9K3c0Cp1Zoncg1lVQ4qDJsXyyxgV9LyGVALrOOhCLxe5YBjUrIuWoeeZn9v26AY8tM%3D";
+        window.__genspark_locale = "en-US";
+        window.__genspark_token = "To/BnjzloZ3UfQdcSaYfDo+vEnSppf27KctJ+Fd1w0w7sUxRbsw9AOydj0TJDAOoZQj8tXoz0L/zbEEqKA4ClCNVrnDktzOlErZL+jQcMHD5NDazInJFgAExjnL3e1oot3Zv/hOxDWtaOAzSa8K0D8zKxPcUFWUZO5q7jgPUwWDG8mfKzO4rGfiWftKR+i0hrBlyr1luGhjur1Q6C0ujyTnDrY+vRcU0hbA5kijY5tbNY6SRPyVYcBkaySv/Dx/UGVfKsq8UWDCvlIApXYpIaPkWH9+/Dqz7PCJSbHJx3GZev+SNCni2vQSWGc+NpqeJqdHX7gSZUJjjHhaEjKkqQyBZQE8eVF9Ap3mbIG1XbbgJslwjKPTsO8eeJ2AZtNLS4jK5HNdFME7VwCEHquCq6FpWxTFVyNAMZook6PaRRLIcBeeSzf56blW/hfUMy+wyv6S+Bom9ORc7EdgLl+EeRpThwB0H/goyJCqRZCwvc9K3c0Cp1Zoncg1lVQ4qDJsXyyxgV9LyGVALrOOhCLxe5YBjUrIuWoeeZn9v26AY8tM=";
+    </script>
+    
+    <script id="html_notice_dialog_script" src="https://www.genspark.ai/notice_dialog.js"></script>
+    
