@@ -1,0 +1,20 @@
+{
+  "name": "shanghai-supplier-catalog",
+  "version": "1.0.0",
+  "description": "Ứng dụng quản lý nhà cung cấp Thượng Hải với Supabase integration",
+  "main": "index.html",
+  "scripts": {
+    "start": "echo 'Static HTML app - no build required'",
+    "build": "echo 'Static HTML app - no build required'"
+  },
+  "keywords": [
+    "supplier",
+    "catalog",
+    "shanghai",
+    "supabase",
+    "vietnam"
+  ],
+  "author": "hksdtp",
+  "license": "MIT",
+  "homepage": "https://github.com/hksdtp/ncc"
+}
