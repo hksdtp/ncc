@@ -721,6 +721,9 @@
                         <button id="uploadAllMedia" class="w-full bg-purple-500 text-white py-2 px-4 rounded-lg hover:bg-purple-600 transition text-sm">
                             <i class="fas fa-cloud-upload-alt mr-2"></i>Upload Tất Cả Ảnh
                         </button>
+                        <button id="clearLocalStorage" class="w-full bg-orange-500 text-white py-2 px-4 rounded-lg hover:bg-orange-600 transition text-sm">
+                            <i class="fas fa-broom mr-2"></i>Dọn Dẹp Bộ Nhớ Local
+                        </button>
                     </div>
                 </div>
 
@@ -991,15 +994,25 @@
                 if (SUPABASE_URL !== 'YOUR_SUPABASE_URL' && SUPABASE_ANON_KEY !== 'YOUR_SUPABASE_ANON_KEY') {
                     supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
                     isSupabaseConnected = true;
-                    console.log('Supabase connected successfully');
+                    console.log('Supabase auto-connected successfully');
+
+                    // Update UI to show connected status
+                    updateSupabaseStatus(true);
+
+                    // Clear old localStorage credentials to prevent conflicts
+                    localStorage.removeItem('supabaseUrl');
+                    localStorage.removeItem('supabaseKey');
+
                     // Auto-sync data on load
                     syncAllDataToSupabase();
                 } else {
                     console.log('Supabase not configured. Using localStorage only.');
+                    updateSupabaseStatus(false);
                 }
             } catch (error) {
                 console.error('Error initializing Supabase:', error);
                 showNotification('Lỗi kết nối Supabase: ' + error.message, 'error');
+                updateSupabaseStatus(false);
             }
         }
         
@@ -1494,7 +1507,18 @@
         }
         
         function saveMediaToStorage() {
-            localStorage.setItem('supplierMedia', JSON.stringify(supplierMedia));
+            // Skip localStorage when Supabase is connected to avoid quota issues
+            if (!isSupabaseConnected) {
+                try {
+                    localStorage.setItem('supplierMedia', JSON.stringify(supplierMedia));
+                } catch (error) {
+                    if (error.name === 'QuotaExceededError') {
+                        console.warn('LocalStorage quota exceeded. Using Supabase as primary storage.');
+                        showNotification('Bộ nhớ local đầy. Dữ liệu được lưu trên cloud.', 'info');
+                    }
+                }
+            }
+            // When Supabase is connected, data is automatically synced to cloud
         }
         
         function loadMediaFromStorage() {
@@ -2163,6 +2187,18 @@
                 showNotification('Chưa kết nối Supabase', 'error');
             }
         });
+
+        document.getElementById('clearLocalStorage').addEventListener('click', function() {
+            if (confirm('Bạn có chắc muốn dọn dẹp bộ nhớ local? Dữ liệu sẽ được lấy từ cloud.')) {
+                clearLocalStorageMedia();
+                // Reload data from Supabase
+                if (isSupabaseConnected) {
+                    setTimeout(() => {
+                        loadDataFromSupabase();
+                    }, 500);
+                }
+            }
+        });
         
         function updateSupabaseStatus(connected) {
             const statusElement = document.getElementById('supabaseStatus');
@@ -2197,7 +2233,17 @@
             }
         }
         
-        // Supabase is now auto-configured - no manual setup needed
+        // Clear localStorage media data when using Supabase to free up space
+        function clearLocalStorageMedia() {
+            try {
+                localStorage.removeItem('supplierMedia');
+                localStorage.removeItem('suppliersData');
+                console.log('Cleared localStorage media data - using Supabase as primary storage');
+                showNotification('Đã dọn dẹp bộ nhớ local. Dữ liệu được lưu trên cloud.', 'success');
+            } catch (error) {
+                console.error('Error clearing localStorage:', error);
+            }
+        }
 
         // Auto-save when page is about to be closed
         window.addEventListener('beforeunload', function() {

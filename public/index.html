@@ -1503,7 +1503,18 @@
         }
         
         function saveMediaToStorage() {
-            localStorage.setItem('supplierMedia', JSON.stringify(supplierMedia));
+            // Skip localStorage when Supabase is connected to avoid quota issues
+            if (!isSupabaseConnected) {
+                try {
+                    localStorage.setItem('supplierMedia', JSON.stringify(supplierMedia));
+                } catch (error) {
+                    if (error.name === 'QuotaExceededError') {
+                        console.warn('LocalStorage quota exceeded. Using Supabase as primary storage.');
+                        showNotification('Bộ nhớ local đầy. Dữ liệu được lưu trên cloud.', 'info');
+                    }
+                }
+            }
+            // When Supabase is connected, data is automatically synced to cloud
         }
         
         function loadMediaFromStorage() {
