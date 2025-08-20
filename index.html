@@ -813,6 +813,9 @@
                         <button id="syncToSupabase" class="w-full bg-blue-500 text-white py-2 px-4 rounded-lg hover:bg-blue-600 transition text-sm">
                             <i class="fas fa-sync mr-2"></i>Đồng Bộ Dữ Liệu
                         </button>
+                        <button id="testBucket" class="w-full bg-blue-500 text-white py-2 px-4 rounded-lg hover:bg-blue-600 transition text-sm mb-2">
+                            <i class="fas fa-check-circle mr-2"></i>Kiểm Tra Bucket
+                        </button>
                         <button id="uploadAllMedia" class="w-full bg-purple-500 text-white py-2 px-4 rounded-lg hover:bg-purple-600 transition text-sm">
                             <i class="fas fa-cloud-upload-alt mr-2"></i>Upload Tất Cả Ảnh
                         </button>
@@ -1085,9 +1088,9 @@
 
     <script>
         // App Version for cache busting
-        const APP_VERSION = '2.2.0-fixed';
+        const APP_VERSION = '2.3.0-cloud-priority';
         const BUILD_TIME = new Date().toISOString();
-        console.log(`Shanghai Supplier Catalog v${APP_VERSION} - Pinterest Style - Built: ${BUILD_TIME}`);
+        console.log(`Shanghai Supplier Catalog v${APP_VERSION} - Cloud Storage Priority - Built: ${BUILD_TIME}`);
 
         // Force cache refresh
         if ('serviceWorker' in navigator) {
@@ -1170,9 +1173,45 @@
             }
         }
         
+        // Check if bucket exists and is accessible
+        async function checkSupabaseBucket() {
+            try {
+                const { data, error } = await supabase.storage.listBuckets();
+                if (error) {
+                    console.error('Error listing buckets:', error);
+                    return false;
+                }
+
+                const bucket = data.find(b => b.name === 'media-uploads');
+                if (!bucket) {
+                    console.error('Bucket "media-uploads" not found');
+                    showNotification('Bucket "media-uploads" chưa được tạo trong Supabase', 'error');
+                    return false;
+                }
+
+                if (!bucket.public) {
+                    console.warn('Bucket "media-uploads" is not public');
+                    showNotification('Bucket "media-uploads" chưa được set public', 'warning');
+                }
+
+                console.log('✅ Bucket "media-uploads" found and accessible');
+                return true;
+            } catch (error) {
+                console.error('Error checking bucket:', error);
+                return false;
+            }
+        }
+
         async function uploadSingleMediaToSupabase(supplierId, mediaItem) {
             if (!isSupabaseConnected) return null;
-            
+
+            // Check bucket first
+            const bucketOk = await checkSupabaseBucket();
+            if (!bucketOk) {
+                showNotification('Lỗi: Bucket Supabase chưa được cấu hình đúng', 'error');
+                return null;
+            }
+
             try {
                 showNotification('Đang upload ảnh lên Supabase...', 'info');
                 
@@ -1186,20 +1225,40 @@
                 
                 // Upload to Supabase Storage
                 const { data, error } = await supabase.storage
-                    .from('supplier-media-public')
+                    .from('media-uploads')
                     .upload(fileName, blob, {
                         cacheControl: '3600',
                         upsert: false
                     });
                 
                 if (error) {
-                    console.error('Storage upload error:', error);
-                    throw error;
+                    console.error('Storage upload error details:', {
+                        message: error.message,
+                        status: error.status,
+                        statusCode: error.statusCode,
+                        details: error
+                    });
+
+                    // Thử upload với upsert=true nếu bị lỗi
+                    console.log('Retrying upload with upsert=true...');
+                    const { data: retryData, error: retryError } = await supabase.storage
+                        .from('media-uploads')
+                        .upload(fileName, blob, {
+                            cacheControl: '3600',
+                            upsert: true
+                        });
+
+                    if (retryError) {
+                        console.error('Retry upload failed:', retryError);
+                        throw new Error(`Upload failed: ${retryError.message} (Status: ${retryError.status || 'unknown'})`);
+                    }
+
+                    console.log('Retry upload successful:', retryData);
                 }
                 
                 // Get public URL
                 const { data: publicData } = supabase.storage
-                    .from('supplier-media-public')
+                    .from('media-uploads')
                     .getPublicUrl(fileName);
                 
                 // Update media item with Supabase info
@@ -1604,9 +1663,27 @@
         }
         
         function handleFiles(files) {
-            if (!currentSupplierId) return;
-            
-            Array.from(files).forEach(file => {
+            console.log('🚀 handleFiles called with', files.length, 'files');
+            console.log('📊 Current supplier ID:', currentSupplierId);
+            console.log('🔗 Supabase connected:', isSupabaseConnected);
+
+            if (!currentSupplierId) {
+                console.error('❌ No supplier selected');
+                alert('Vui lòng chọn nhà cung cấp trước khi upload');
+                return;
+            }
+
+            if (!isSupabaseConnected) {
+                console.error('❌ Supabase not connected');
+                alert('Chưa kết nối Supabase. Ảnh sẽ chỉ lưu cục bộ.');
+            }
+
+            Array.from(files).forEach((file, index) => {
+                console.log(`📁 Processing file ${index + 1}:`, {
+                    name: file.name,
+                    type: file.type,
+                    size: file.size
+                });
                 if (file.type.startsWith('image/') || file.type.startsWith('video/')) {
                     const reader = new FileReader();
                     reader.onload = function(e) {
@@ -1626,16 +1703,28 @@
                         renderMediaGrid();
                         showNotification(`Đã tải lên ${file.name} thành công!`);
                         
-                        // Auto-upload to Supabase immediately
+                        // Auto-upload to Supabase immediately (PRIORITY)
                         if (isSupabaseConnected) {
+                            console.log('🔄 Starting immediate Supabase upload for:', file.name);
                             uploadSingleMediaToSupabase(currentSupplierId, mediaItem).then(uploadedItem => {
                                 if (uploadedItem) {
+                                    console.log('✅ Supabase upload successful:', uploadedItem.supabase_url);
                                     // Update local storage with Supabase info
                                     saveMediaToStorage();
+                                    // Refresh display to show cloud status
+                                    renderMediaGrid();
                                     // Sync metadata to database
                                     syncMediaToSupabase(currentSupplierId, supplierMedia[currentSupplierId]);
+                                } else {
+                                    console.error('❌ Supabase upload failed for:', file.name);
                                 }
+                            }).catch(error => {
+                                console.error('❌ Upload error:', error);
+                                showNotification('Lỗi upload lên cloud: ' + error.message, 'error');
                             });
+                        } else {
+                            console.warn('⚠️ Supabase not connected - file saved locally only');
+                            showNotification('Ảnh đã lưu cục bộ. Kết nối Supabase để đồng bộ cloud.', 'warning');
                         }
                     };
                     reader.readAsDataURL(file);
@@ -1716,7 +1805,7 @@
 
             try {
                 const { error } = await supabase.storage
-                    .from('supplier-media-public')
+                    .from('media-uploads')
                     .remove([filePath]);
 
                 if (error) {
@@ -2451,6 +2540,14 @@
             }
         });
         
+        document.getElementById('testBucket').addEventListener('click', async function() {
+            showNotification('Đang kiểm tra bucket...', 'info');
+            const bucketOk = await checkSupabaseBucket();
+            if (bucketOk) {
+                showNotification('✅ Bucket hoạt động bình thường!', 'success');
+            }
+        });
+
         document.getElementById('uploadAllMedia').addEventListener('click', function() {
             if (isSupabaseConnected) {
                 uploadAllLocalMediaToSupabase();
