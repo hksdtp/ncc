@@ -355,6 +355,15 @@
             border-color: #3b82f6;
             box-shadow: 0 8px 25px rgba(59, 130, 246, 0.2);
         }
+
+        .media-item .delete-btn {
+            transition: all 0.2s ease;
+        }
+
+        .media-item .delete-btn:hover {
+            background-color: #dc2626 !important;
+            transform: scale(1.1);
+        }
         
         .media-item img,
         .media-item video {
@@ -938,9 +947,16 @@
                     <i class="fas fa-images"></i>
                     Hình ảnh sản phẩm
                 </h2>
-                <button class="gallery-close" onclick="closeMediaGallery()">
-                    <i class="fas fa-times"></i>
-                </button>
+                <div class="flex items-center gap-2">
+                    <button id="deleteAllMediaBtn" class="bg-red-500 text-white px-3 py-1 rounded-lg hover:bg-red-600 transition text-sm"
+                            onclick="deleteAllSupplierMedia(currentSupplierId)"
+                            title="Xóa tất cả ảnh">
+                        <i class="fas fa-trash mr-1"></i>Xóa Tất Cả
+                    </button>
+                    <button class="gallery-close" onclick="closeMediaGallery()">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
             </div>
             <div class="gallery-body">
                 <div class="upload-area" onclick="triggerFileUpload()" ondrop="handleDrop(event)" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)">
@@ -1360,6 +1376,13 @@
                 storageStatus.parentElement.style.background = '#f1f5f9';
             }
             
+            // Update delete all button visibility
+            const deleteAllBtn = document.getElementById('deleteAllMediaBtn');
+            const mediaItems = supplierMedia[supplierId] || [];
+            if (deleteAllBtn) {
+                deleteAllBtn.style.display = mediaItems.length > 0 ? 'block' : 'none';
+            }
+
             const gallery = document.getElementById('mediaGallery');
             if (gallery) {
                 gallery.classList.add('active');
@@ -1367,7 +1390,7 @@
             } else {
                 console.error('Gallery element not found');
             }
-            
+
             renderMediaGrid();
         }
         
@@ -1379,8 +1402,14 @@
         function renderMediaGrid() {
             const mediaGrid = document.getElementById('mediaGrid');
             const emptyGallery = document.getElementById('emptyGallery');
+            const deleteAllBtn = document.getElementById('deleteAllMediaBtn');
             const media = supplierMedia[currentSupplierId] || [];
-            
+
+            // Update delete all button visibility
+            if (deleteAllBtn) {
+                deleteAllBtn.style.display = media.length > 0 ? 'block' : 'none';
+            }
+
             if (media.length === 0) {
                 mediaGrid.style.display = 'none';
                 emptyGallery.style.display = 'block';
@@ -1396,13 +1425,18 @@
                         '<div class="absolute top-2 right-2 bg-gray-500 text-white text-xs px-2 py-1 rounded-full"><i class="fas fa-hdd mr-1"></i>Local</div>';
                     
                     return `
-                        <div class="media-item relative" onclick="openFullscreenViewer(${index})">
-                            ${isVideo ? 
+                        <div class="media-item relative group" onclick="openFullscreenViewer(${index})">
+                            ${isVideo ?
                                 `<video src="${imageUrl}" muted></video>
                                  <div class="play-icon"><i class="fas fa-play"></i></div>` :
                                 `<img src="${imageUrl}" alt="Product Image">`
                             }
                             ${uploadStatus}
+                            <button class="absolute top-2 left-2 bg-red-500 text-white text-xs px-2 py-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10"
+                                    onclick="event.stopPropagation(); deleteMediaItem(${index})"
+                                    title="Xóa ảnh">
+                                <i class="fas fa-trash"></i>
+                            </button>
                         </div>
                     `;
                 }).join('');
@@ -1504,6 +1538,114 @@
         function closeFullscreenViewer() {
             document.getElementById('fullscreenViewer').classList.remove('active');
             document.getElementById('fullscreenMedia').innerHTML = '';
+        }
+
+        // Delete media item function
+        async function deleteMediaItem(index) {
+            if (!currentSupplierId) return;
+
+            const mediaItems = supplierMedia[currentSupplierId];
+            if (!mediaItems || index >= mediaItems.length) return;
+
+            const mediaItem = mediaItems[index];
+            const fileName = mediaItem.name || 'ảnh này';
+
+            if (!confirm(`Bạn có chắc muốn xóa "${fileName}"?\nHành động này không thể hoàn tác.`)) {
+                return;
+            }
+
+            try {
+                showNotification('Đang xóa ảnh...', 'info');
+
+                // Delete from Supabase Storage if uploaded
+                if (isSupabaseConnected && mediaItem.supabase_path) {
+                    await deleteMediaFromSupabase(mediaItem.supabase_path);
+                }
+
+                // Remove from local array
+                mediaItems.splice(index, 1);
+
+                // Update storage and database
+                saveMediaToStorage();
+                if (isSupabaseConnected) {
+                    await syncMediaToSupabase(currentSupplierId, mediaItems);
+                }
+
+                // Refresh gallery
+                renderMediaGrid();
+                showNotification(`Đã xóa "${fileName}" thành công!`, 'success');
+
+            } catch (error) {
+                console.error('Error deleting media:', error);
+                showNotification('Lỗi khi xóa ảnh: ' + error.message, 'error');
+            }
+        }
+
+        // Delete media from Supabase Storage
+        async function deleteMediaFromSupabase(filePath) {
+            if (!isSupabaseConnected || !filePath) return;
+
+            try {
+                const { error } = await supabase.storage
+                    .from('supplier-media')
+                    .remove([filePath]);
+
+                if (error) {
+                    console.error('Supabase storage delete error:', error);
+                    throw error;
+                }
+
+                console.log('Media deleted from Supabase storage:', filePath);
+
+            } catch (error) {
+                console.error('Error deleting from Supabase storage:', error);
+                throw error;
+            }
+        }
+
+        // Delete all media for a supplier
+        async function deleteAllSupplierMedia(supplierId) {
+            if (!supplierId || !supplierMedia[supplierId]) return;
+
+            const mediaItems = supplierMedia[supplierId];
+            const supplierName = suppliersData[supplierId]?.name || `Nhà cung cấp ${supplierId}`;
+
+            if (!confirm(`Bạn có chắc muốn xóa TẤT CẢ ${mediaItems.length} ảnh của "${supplierName}"?\nHành động này không thể hoàn tác.`)) {
+                return;
+            }
+
+            try {
+                showNotification('Đang xóa tất cả ảnh...', 'info');
+
+                // Delete from Supabase Storage if connected
+                if (isSupabaseConnected) {
+                    const deletePromises = mediaItems
+                        .filter(item => item.supabase_path)
+                        .map(item => deleteMediaFromSupabase(item.supabase_path));
+
+                    await Promise.all(deletePromises);
+                }
+
+                // Clear local array
+                supplierMedia[supplierId] = [];
+
+                // Update storage and database
+                saveMediaToStorage();
+                if (isSupabaseConnected) {
+                    await syncMediaToSupabase(supplierId, []);
+                }
+
+                // Refresh gallery if currently open
+                if (currentSupplierId === supplierId) {
+                    renderMediaGrid();
+                }
+
+                showNotification(`Đã xóa tất cả ảnh của "${supplierName}" thành công!`, 'success');
+
+            } catch (error) {
+                console.error('Error deleting all media:', error);
+                showNotification('Lỗi khi xóa ảnh: ' + error.message, 'error');
+            }
         }
         
         function saveMediaToStorage() {

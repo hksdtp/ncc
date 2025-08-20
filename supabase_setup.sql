@@ -134,6 +134,50 @@ CREATE TRIGGER update_supplier_media_updated_at
     BEFORE UPDATE ON supplier_media 
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+-- 11. TẠO FUNCTION ĐỂ DỌN DẸP STORAGE KHI XÓA MEDIA
+-- =====================================================
+CREATE OR REPLACE FUNCTION cleanup_orphaned_storage_files()
+RETURNS void AS $$
+DECLARE
+    file_record RECORD;
+    media_exists BOOLEAN;
+BEGIN
+    -- Loop through all files in storage
+    FOR file_record IN
+        SELECT name FROM storage.objects WHERE bucket_id = 'supplier-media'
+    LOOP
+        -- Check if file is referenced in any media_items
+        SELECT EXISTS(
+            SELECT 1 FROM supplier_media
+            WHERE media_items::text LIKE '%' || file_record.name || '%'
+        ) INTO media_exists;
+
+        -- Delete file if not referenced
+        IF NOT media_exists THEN
+            DELETE FROM storage.objects
+            WHERE bucket_id = 'supplier-media' AND name = file_record.name;
+
+            RAISE NOTICE 'Deleted orphaned file: %', file_record.name;
+        END IF;
+    END LOOP;
+END;
+$$ LANGUAGE plpgsql;
+
+-- 12. TẠO FUNCTION ĐỂ XÓA TẤT CẢ MEDIA CỦA SUPPLIER
+-- =====================================================
+CREATE OR REPLACE FUNCTION delete_supplier_media(supplier_id_param INTEGER)
+RETURNS void AS $$
+BEGIN
+    -- Delete media metadata from database
+    DELETE FROM supplier_media WHERE supplier_id = supplier_id_param;
+
+    -- Note: Storage files should be deleted from application level
+    -- This function only handles database cleanup
+
+    RAISE NOTICE 'Deleted all media for supplier: %', supplier_id_param;
+END;
+$$ LANGUAGE plpgsql;
+
 -- =====================================================
 -- HOÀN THÀNH SETUP!
 -- =====================================================
@@ -141,6 +185,11 @@ CREATE TRIGGER update_supplier_media_updated_at
 -- 1. Kiểm tra Tables đã được tạo trong Database
 -- 2. Kiểm tra Storage bucket 'supplier-media' đã được tạo
 -- 3. Kết nối ứng dụng với Supabase URL và Anon Key
--- 4. Test upload ảnh để đảm bảo mọi thứ hoạt động
+-- 4. Test upload và xóa ảnh để đảm bảo mọi thứ hoạt động
 
-SELECT 'Setup completed successfully! 🎉' as status;
+-- Tính năng mới:
+-- - Xóa từng ảnh riêng lẻ
+-- - Xóa tất cả ảnh của nhà cung cấp
+-- - Tự động dọn dẹp storage files không sử dụng
+
+SELECT 'Setup completed successfully with delete features! 🎉' as status;

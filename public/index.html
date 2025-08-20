@@ -1392,13 +1392,18 @@
                         '<div class="absolute top-2 right-2 bg-gray-500 text-white text-xs px-2 py-1 rounded-full"><i class="fas fa-hdd mr-1"></i>Local</div>';
                     
                     return `
-                        <div class="media-item relative" onclick="openFullscreenViewer(${index})">
-                            ${isVideo ? 
+                        <div class="media-item relative group" onclick="openFullscreenViewer(${index})">
+                            ${isVideo ?
                                 `<video src="${imageUrl}" muted></video>
                                  <div class="play-icon"><i class="fas fa-play"></i></div>` :
                                 `<img src="${imageUrl}" alt="Product Image">`
                             }
                             ${uploadStatus}
+                            <button class="absolute top-2 left-2 bg-red-500 text-white text-xs px-2 py-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10"
+                                    onclick="event.stopPropagation(); deleteMediaItem(${index})"
+                                    title="Xóa ảnh">
+                                <i class="fas fa-trash"></i>
+                            </button>
                         </div>
                     `;
                 }).join('');
