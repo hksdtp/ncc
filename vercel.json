@@ -1,4 +1,6 @@
 {
+  "buildCommand": "echo 'Static HTML app - no build required'",
+  "outputDirectory": "public",
   "rewrites": [
     {
       "source": "/((?!index\\.html$|shanghai_catalog_source_code\\.html$|README\\.md$).*)",

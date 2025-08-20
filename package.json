@@ -5,7 +5,7 @@
   "main": "index.html",
   "scripts": {
     "start": "echo 'Static HTML app - no build required'",
-    "build": "echo 'Static HTML app - no build required'"
+    "build": "mkdir -p public && cp *.html public/ && echo 'Files copied to public directory'"
   },
   "keywords": [
     "supplier",
