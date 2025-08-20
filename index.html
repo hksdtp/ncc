@@ -801,9 +801,46 @@
                     <input type="file" id="importTexts" accept=".json" class="w-full p-2 border rounded-lg">
                 </div>
 
+                <!-- Storage Configuration -->
+                <div>
+                    <h4 class="editable font-medium mb-3" data-key="storage-config-title">Cấu Hình Lưu Trữ</h4>
+
+                    <!-- Storage Type Selection -->
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium mb-2">Loại lưu trữ:</label>
+                        <select id="storageType" class="w-full p-2 border rounded-lg">
+                            <option value="supabase">Supabase Cloud</option>
+                            <option value="custom">Máy chủ riêng</option>
+                            <option value="local">Chỉ lưu cục bộ</option>
+                        </select>
+                    </div>
+
+                    <!-- Custom Server Configuration -->
+                    <div id="customServerConfig" class="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg" style="display: none;">
+                        <h5 class="font-medium mb-2">Cấu hình máy chủ riêng:</h5>
+                        <div class="space-y-2">
+                            <div>
+                                <label class="block text-xs font-medium">Upload URL:</label>
+                                <input type="text" id="customUploadUrl" placeholder="http://222.252.23.248:8080/upload" class="w-full p-1 text-xs border rounded">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium">Base URL (để xem ảnh):</label>
+                                <input type="text" id="customBaseUrl" placeholder="http://222.252.23.248:8080/files" class="w-full p-1 text-xs border rounded">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium">API Key (tùy chọn):</label>
+                                <input type="text" id="customApiKey" placeholder="your-api-key" class="w-full p-1 text-xs border rounded">
+                            </div>
+                            <button id="testCustomServer" class="w-full bg-blue-500 text-white py-1 px-2 rounded text-xs hover:bg-blue-600">
+                                Kiểm tra kết nối
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Cloud Storage Management -->
                 <div>
-                    <h4 class="editable font-medium mb-3" data-key="cloud-storage-title">Quản Lý Cloud Storage</h4>
+                    <h4 class="editable font-medium mb-3" data-key="cloud-storage-title">Quản Lý Lưu Trữ</h4>
                     <div class="space-y-3">
                         <div id="supabaseStatus" class="text-sm p-3 bg-green-50 border border-green-200 rounded-lg">
                             <i class="fas fa-circle text-green-500 mr-1"></i>
@@ -1088,9 +1125,27 @@
 
     <script>
         // App Version for cache busting
-        const APP_VERSION = '2.3.0-cloud-priority';
+        const APP_VERSION = '2.4.0-custom-server';
         const BUILD_TIME = new Date().toISOString();
-        console.log(`Shanghai Supplier Catalog v${APP_VERSION} - Cloud Storage Priority - Built: ${BUILD_TIME}`);
+        console.log(`Shanghai Supplier Catalog v${APP_VERSION} - Custom Server Support - Built: ${BUILD_TIME}`);
+
+        // Storage Configuration
+        const STORAGE_CONFIG = {
+            // Storage type: 'supabase', 'custom', 'local'
+            type: 'supabase', // Default to Supabase, can be changed
+
+            // Custom server configuration
+            custom: {
+                uploadUrl: '', // Will be set when custom server is configured
+                baseUrl: '',   // Base URL for serving files
+                apiKey: ''     // Optional API key for authentication
+            },
+
+            // Supabase configuration (existing)
+            supabase: {
+                bucket: 'media-uploads'
+            }
+        };
 
         // Force cache refresh
         if ('serviceWorker' in navigator) {
@@ -1173,6 +1228,127 @@
             }
         }
         
+        // Storage Adapter Pattern - Unified interface for different storage backends
+        class StorageAdapter {
+            constructor(config) {
+                this.config = config;
+                this.type = config.type;
+            }
+
+            async upload(file, fileName, supplierId) {
+                switch (this.type) {
+                    case 'supabase':
+                        return await this.uploadToSupabase(file, fileName, supplierId);
+                    case 'custom':
+                        return await this.uploadToCustomServer(file, fileName, supplierId);
+                    case 'local':
+                        return await this.uploadToLocal(file, fileName, supplierId);
+                    default:
+                        throw new Error('Unknown storage type: ' + this.type);
+                }
+            }
+
+            async uploadToSupabase(file, fileName, supplierId) {
+                // Existing Supabase upload logic
+                const { data, error } = await supabase.storage
+                    .from(this.config.supabase.bucket)
+                    .upload(fileName, file, {
+                        cacheControl: '3600',
+                        upsert: false
+                    });
+
+                if (error) {
+                    // Retry with upsert=true
+                    const { data: retryData, error: retryError } = await supabase.storage
+                        .from(this.config.supabase.bucket)
+                        .upload(fileName, file, {
+                            cacheControl: '3600',
+                            upsert: true
+                        });
+
+                    if (retryError) throw retryError;
+                }
+
+                const { data: publicData } = supabase.storage
+                    .from(this.config.supabase.bucket)
+                    .getPublicUrl(fileName);
+
+                return {
+                    url: publicData.publicUrl,
+                    path: fileName,
+                    type: 'supabase'
+                };
+            }
+
+            async uploadToCustomServer(file, fileName, supplierId) {
+                const formData = new FormData();
+                formData.append('file', file);
+                formData.append('fileName', fileName);
+                formData.append('supplierId', supplierId);
+
+                if (this.config.custom.apiKey) {
+                    formData.append('apiKey', this.config.custom.apiKey);
+                }
+
+                const response = await fetch(this.config.custom.uploadUrl, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Upload failed: ${response.status} ${response.statusText}`);
+                }
+
+                const result = await response.json();
+                return {
+                    url: result.url || `${this.config.custom.baseUrl}/${fileName}`,
+                    path: fileName,
+                    type: 'custom'
+                };
+            }
+
+            async uploadToLocal(file, fileName, supplierId) {
+                // Convert file to base64 for local storage
+                return new Promise((resolve) => {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        resolve({
+                            url: e.target.result,
+                            path: fileName,
+                            type: 'local'
+                        });
+                    };
+                    reader.readAsDataURL(file);
+                });
+            }
+        }
+
+        // Load storage configuration from localStorage
+        function loadStorageConfig() {
+            const saved = localStorage.getItem('storageConfig');
+            if (saved) {
+                try {
+                    const savedConfig = JSON.parse(saved);
+                    Object.assign(STORAGE_CONFIG, savedConfig);
+                    console.log('Loaded storage config:', STORAGE_CONFIG);
+                } catch (error) {
+                    console.error('Error loading storage config:', error);
+                }
+            }
+
+            // Update UI
+            document.getElementById('storageType').value = STORAGE_CONFIG.type;
+            if (STORAGE_CONFIG.type === 'custom') {
+                document.getElementById('customServerConfig').style.display = 'block';
+                document.getElementById('customUploadUrl').value = STORAGE_CONFIG.custom.uploadUrl || '';
+                document.getElementById('customBaseUrl').value = STORAGE_CONFIG.custom.baseUrl || '';
+                document.getElementById('customApiKey').value = STORAGE_CONFIG.custom.apiKey || '';
+            }
+        }
+
+        // Initialize storage adapter
+        const storageAdapter = new StorageAdapter(STORAGE_CONFIG);
+
         // Check if bucket exists and is accessible
         async function checkSupabaseBucket() {
             try {
@@ -1202,7 +1378,51 @@
             }
         }
 
+        // Updated upload function using Storage Adapter
+        async function uploadSingleMediaToStorage(supplierId, mediaItem) {
+            try {
+                showNotification(`Đang upload ảnh lên ${STORAGE_CONFIG.type}...`, 'info');
+
+                // Convert base64 to blob if needed
+                let file;
+                if (mediaItem.url.startsWith('data:')) {
+                    const response = await fetch(mediaItem.url);
+                    file = await response.blob();
+                } else {
+                    file = mediaItem.file; // If direct file object
+                }
+
+                // Create unique filename
+                const fileExtension = mediaItem.name.split('.').pop() || 'jpg';
+                const fileName = `supplier_${supplierId}/${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${fileExtension}`;
+
+                // Upload using storage adapter
+                const result = await storageAdapter.upload(file, fileName, supplierId);
+
+                // Update media item with storage info
+                mediaItem.storage_url = result.url;
+                mediaItem.storage_path = result.path;
+                mediaItem.storage_type = result.type;
+                mediaItem.uploaded_to_storage = true;
+
+                console.log(`Media uploaded to ${result.type}:`, fileName);
+                showNotification('Upload ảnh thành công!', 'success');
+
+                return mediaItem;
+
+            } catch (error) {
+                console.error('Error uploading media:', error);
+                showNotification('Lỗi upload ảnh: ' + error.message, 'error');
+                return null;
+            }
+        }
+
+        // Legacy function for backward compatibility
         async function uploadSingleMediaToSupabase(supplierId, mediaItem) {
+            if (STORAGE_CONFIG.type !== 'supabase') {
+                return await uploadSingleMediaToStorage(supplierId, mediaItem);
+            }
+
             if (!isSupabaseConnected) return null;
 
             // Check bucket first
@@ -1606,10 +1826,21 @@
                 
                 mediaGrid.innerHTML = media.map((item, index) => {
                     const isVideo = item.type.startsWith('video/');
-                    const imageUrl = item.supabase_url || item.url; // Use Supabase URL if available
-                    const uploadStatus = item.uploaded_to_supabase ? 
-                        '<div class="absolute top-2 right-2 bg-green-500 text-white text-xs px-2 py-1 rounded-full"><i class="fas fa-cloud-check mr-1"></i>Cloud</div>' : 
-                        '<div class="absolute top-2 right-2 bg-gray-500 text-white text-xs px-2 py-1 rounded-full"><i class="fas fa-hdd mr-1"></i>Local</div>';
+                    // Use storage URL if available, fallback to local URL
+                    const imageUrl = item.storage_url || item.supabase_url || item.url;
+
+                    // Dynamic upload status based on storage type
+                    let uploadStatus = '';
+                    if (item.uploaded_to_storage || item.uploaded_to_supabase) {
+                        const storageType = item.storage_type || 'supabase';
+                        const storageIcon = storageType === 'custom' ? 'fas fa-server' :
+                                          storageType === 'supabase' ? 'fas fa-cloud' : 'fas fa-cloud-check';
+                        const storageLabel = storageType === 'custom' ? 'Server' :
+                                           storageType === 'supabase' ? 'Cloud' : 'Cloud';
+                        uploadStatus = `<div class="absolute top-2 right-2 bg-green-500 text-white text-xs px-2 py-1 rounded-full"><i class="${storageIcon} mr-1"></i>${storageLabel}</div>`;
+                    } else {
+                        uploadStatus = '<div class="absolute top-2 right-2 bg-gray-500 text-white text-xs px-2 py-1 rounded-full"><i class="fas fa-hdd mr-1"></i>Local</div>';
+                    }
                     
                     return `
                         <div class="media-item relative group" onclick="openFullscreenViewer(${index})">
@@ -1705,8 +1936,8 @@
                         
                         // Auto-upload to Supabase immediately (PRIORITY)
                         if (isSupabaseConnected) {
-                            console.log('🔄 Starting immediate Supabase upload for:', file.name);
-                            uploadSingleMediaToSupabase(currentSupplierId, mediaItem).then(uploadedItem => {
+                            console.log(`🔄 Starting immediate ${STORAGE_CONFIG.type} upload for:`, file.name);
+                            uploadSingleMediaToStorage(currentSupplierId, mediaItem).then(uploadedItem => {
                                 if (uploadedItem) {
                                     console.log('✅ Supabase upload successful:', uploadedItem.supabase_url);
                                     // Update local storage with Supabase info
@@ -1935,6 +2166,7 @@
 
         // Initialize
         document.addEventListener('DOMContentLoaded', function() {
+            loadStorageConfig(); // Load storage configuration first
             loadTextSettings();
             updateEditIndicators();
             updateLastUpdated();
@@ -2540,11 +2772,77 @@
             }
         });
         
+        // Storage configuration handlers
+        document.getElementById('storageType').addEventListener('change', function() {
+            const storageType = this.value;
+            const customConfig = document.getElementById('customServerConfig');
+
+            // Update global config
+            STORAGE_CONFIG.type = storageType;
+            storageAdapter.type = storageType;
+            storageAdapter.config = STORAGE_CONFIG;
+
+            // Show/hide custom server config
+            if (storageType === 'custom') {
+                customConfig.style.display = 'block';
+            } else {
+                customConfig.style.display = 'none';
+            }
+
+            // Save to localStorage
+            localStorage.setItem('storageConfig', JSON.stringify(STORAGE_CONFIG));
+
+            showNotification(`Đã chuyển sang lưu trữ: ${storageType}`, 'info');
+        });
+
+        document.getElementById('testCustomServer').addEventListener('click', async function() {
+            const uploadUrl = document.getElementById('customUploadUrl').value;
+            const baseUrl = document.getElementById('customBaseUrl').value;
+            const apiKey = document.getElementById('customApiKey').value;
+
+            if (!uploadUrl || !baseUrl) {
+                showNotification('Vui lòng nhập đầy đủ Upload URL và Base URL', 'error');
+                return;
+            }
+
+            // Update config
+            STORAGE_CONFIG.custom.uploadUrl = uploadUrl;
+            STORAGE_CONFIG.custom.baseUrl = baseUrl;
+            STORAGE_CONFIG.custom.apiKey = apiKey;
+
+            // Save to localStorage
+            localStorage.setItem('storageConfig', JSON.stringify(STORAGE_CONFIG));
+
+            showNotification('Đang kiểm tra kết nối máy chủ...', 'info');
+
+            try {
+                // Test connection with a simple ping
+                const response = await fetch(uploadUrl.replace('/upload', '/ping') || uploadUrl, {
+                    method: 'GET',
+                    headers: apiKey ? { 'Authorization': `Bearer ${apiKey}` } : {}
+                });
+
+                if (response.ok) {
+                    showNotification('✅ Kết nối máy chủ thành công!', 'success');
+                } else {
+                    showNotification(`⚠️ Máy chủ phản hồi: ${response.status}`, 'warning');
+                }
+            } catch (error) {
+                showNotification('❌ Không thể kết nối máy chủ: ' + error.message, 'error');
+            }
+        });
+
         document.getElementById('testBucket').addEventListener('click', async function() {
-            showNotification('Đang kiểm tra bucket...', 'info');
-            const bucketOk = await checkSupabaseBucket();
-            if (bucketOk) {
-                showNotification('✅ Bucket hoạt động bình thường!', 'success');
+            if (STORAGE_CONFIG.type === 'supabase') {
+                showNotification('Đang kiểm tra bucket...', 'info');
+                const bucketOk = await checkSupabaseBucket();
+                if (bucketOk) {
+                    showNotification('✅ Bucket hoạt động bình thường!', 'success');
+                }
+            } else if (STORAGE_CONFIG.type === 'custom') {
+                document.getElementById('testCustomServer').click();
+            } else {
+                showNotification('✅ Local storage luôn sẵn sàng!', 'success');
             }
         });
 
