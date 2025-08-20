@@ -3,7 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title id="page-title">Danh Mục Nhà Cung Cấp Thượng Hải - Phiên Bản Chỉnh Sửa</title>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title id="page-title">Shanghai Supplier Catalog - Pinterest Style v2.0</title>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -1081,6 +1084,10 @@
     </div>
 
     <script>
+        // App Version for cache busting
+        const APP_VERSION = '2.1.0-pinterest';
+        console.log(`Shanghai Supplier Catalog v${APP_VERSION} - Pinterest Style`);
+
         // Supabase Configuration - Auto-configured
         const SUPABASE_URL = 'https://hukhojlhmvpjmiyageqg.supabase.co';
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh1a2hvamxobXZwam1peWFnZXFnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU2ODAwMTQsImV4cCI6MjA3MTI1NjAxNH0.g6KFGNEYtxxvjhc48m1Z3RLwW96g8_j3yPkv_Ly1zo8';
@@ -1088,11 +1095,24 @@
         let supabase;
         let isSupabaseConnected = false;
         
-        // Initialize Supabase
+        // Initialize Supabase with retry logic
         function initSupabase() {
             try {
                 if (SUPABASE_URL !== 'YOUR_SUPABASE_URL' && SUPABASE_ANON_KEY !== 'YOUR_SUPABASE_ANON_KEY') {
-                    supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+                    // Create Supabase client with better config
+                    supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+                        auth: {
+                            persistSession: false
+                        },
+                        db: {
+                            schema: 'public'
+                        },
+                        global: {
+                            headers: {
+                                'x-client-info': 'shanghai-supplier-catalog'
+                            }
+                        }
+                    });
                     isSupabaseConnected = true;
                     console.log('Supabase auto-connected successfully');
 
@@ -1345,7 +1365,19 @@
                 showNotification('Dữ liệu đã được tải từ Supabase', 'success');
             } catch (error) {
                 console.error('Error loading data from Supabase:', error);
-                showNotification('Lỗi tải dữ liệu từ Supabase: ' + error.message, 'error');
+
+                // Handle specific error types
+                if (error.message.includes('timeout') || error.message.includes('Load failed')) {
+                    showNotification('Kết nối Supabase bị timeout. Đang thử lại...', 'warning');
+                    // Retry after 3 seconds
+                    setTimeout(() => {
+                        loadDataFromSupabase();
+                    }, 3000);
+                } else if (error.code === '405' || error.message.includes('405')) {
+                    showNotification('Lỗi quyền truy cập Supabase. Vui lòng kiểm tra RLS policies.', 'error');
+                } else {
+                    showNotification('Lỗi tải dữ liệu từ Supabase: ' + error.message, 'error');
+                }
             }
         }
         
@@ -1624,8 +1656,8 @@
             document.getElementById('fullscreenMedia').innerHTML = '';
         }
 
-        // Delete media item function
-        async function deleteMediaItem(index) {
+        // Delete media item function - Global scope
+        window.deleteMediaItem = async function(index) {
             if (!currentSupplierId) return;
 
             const mediaItems = supplierMedia[currentSupplierId];
