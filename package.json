@@ -16,5 +16,9 @@
   ],
   "author": "hksdtp",
   "license": "MIT",
-  "homepage": "https://github.com/hksdtp/ncc"
+  "homepage": "https://github.com/hksdtp/ncc",
+  "dependencies": {
+    "puppeteer": "^24.16.2",
+    "puppeteer-core": "^24.16.2"
+  }
 }

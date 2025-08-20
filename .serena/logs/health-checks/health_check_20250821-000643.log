@@ -1,0 +1,71 @@
+INFO  2025-08-21 00:06:43,793 serena.cli:health_check:550 - Starting health check for project: /Users/ninh/Library/Mobile Documents/com~apple~CloudDocs/web app/moi
+INFO  2025-08-21 00:06:43,793 serena.cli:health_check:554 - Creating SerenaAgent with disabled dashboard...
+INFO  2025-08-21 00:06:43,871 serena.agent:__init__:198 - Starting Serena server (version=0.1.4-93a2333d-dirty, process id=26897, parent process id=26883)
+INFO  2025-08-21 00:06:43,871 serena.agent:__init__:199 - Configuration file: None
+INFO  2025-08-21 00:06:43,871 serena.agent:__init__:200 - Available projects: 
+INFO  2025-08-21 00:06:43,871 serena.agent:__init__:201 - Loaded tools (36): read_file, create_text_file, list_dir, find_file, replace_regex, delete_lines, replace_lines, insert_at_line, search_for_pattern, restart_language_server, get_symbols_overview, find_symbol, find_referencing_symbols, replace_symbol_body, insert_after_symbol, insert_before_symbol, write_memory, read_memory, list_memories, delete_memory, execute_shell_command, activate_project, remove_project, switch_modes, get_current_config, check_onboarding_performed, onboarding, think_about_collected_information, think_about_task_adherence, think_about_whether_you_are_done, summarize_changes, prepare_for_new_conversation, initial_instructions, jet_brains_find_symbol, jet_brains_find_referencing_symbols, jet_brains_get_symbols_overview
+INFO  2025-08-21 00:06:43,872 serena.config.serena_config:apply:106 - SerenaAgentContext[name='desktop-app'] included 1 tools: switch_modes
+INFO  2025-08-21 00:06:43,873 serena.agent:__init__:215 - Number of exposed tools: 25
+INFO  2025-08-21 00:06:43,886 serena.agent:_update_active_tools:397 - Active tools (25): activate_project, check_onboarding_performed, create_text_file, delete_memory, execute_shell_command, find_file, find_referencing_symbols, find_symbol, get_symbols_overview, insert_after_symbol, insert_before_symbol, list_dir, list_memories, onboarding, prepare_for_new_conversation, read_file, read_memory, replace_regex, replace_symbol_body, search_for_pattern, switch_modes, think_about_collected_information, think_about_task_adherence, think_about_whether_you_are_done, write_memory
+INFO  2025-08-21 00:06:43,888 serena.project:__init__:31 - Parsing all gitignore files in /Users/ninh/Library/Mobile Documents/com~apple~CloudDocs/web app/moi
+INFO  2025-08-21 00:06:43,898 serena.project:__init__:33 - Found 0 gitignore files.
+INFO  2025-08-21 00:06:43,898 serena.agent:load_project_from_path_or_name:472 - Added new project moi for path /Users/ninh/Library/Mobile Documents/com~apple~CloudDocs/web app/moi
+INFO  2025-08-21 00:06:43,898 serena.agent:_activate_project:437 - Activating moi at /Users/ninh/Library/Mobile Documents/com~apple~CloudDocs/web app/moi
+INFO  2025-08-21 00:06:43,898 serena.agent:_update_active_tools:397 - Active tools (25): activate_project, check_onboarding_performed, create_text_file, delete_memory, execute_shell_command, find_file, find_referencing_symbols, find_symbol, get_symbols_overview, insert_after_symbol, insert_before_symbol, list_dir, list_memories, onboarding, prepare_for_new_conversation, read_file, read_memory, replace_regex, replace_symbol_body, search_for_pattern, switch_modes, think_about_collected_information, think_about_task_adherence, think_about_whether_you_are_done, write_memory
+INFO  2025-08-21 00:06:43,898 serena.agent:issue_task:416 - Scheduling Task-1[init_language_server]
+INFO  2025-08-21 00:06:43,898 serena.agent:start:329 - Task-1[init_language_server] starting ...
+INFO  2025-08-21 00:06:43,898 serena.cli:health_check:557 - SerenaAgent created successfully
+INFO  2025-08-21 00:06:43,898 serena.cli:health_check:560 - Searching for analyzable files...
+INFO  2025-08-21 00:06:43,898 serena.agent:start:329 - Language server initialization starting ...
+INFO  2025-08-21 00:06:43,899 serena.project:create_language_server:285 - Creating language server instance for /Users/ninh/Library/Mobile Documents/com~apple~CloudDocs/web app/moi.
+INFO  2025-08-21 00:06:44,019 solidlsp:load_cache:1638 - Loading document symbols cache from /Users/ninh/Library/Mobile Documents/com~apple~CloudDocs/web app/moi/.serena/cache/typescript/document_symbols_cache_v23-06-25.pkl
+INFO  2025-08-21 00:06:44,611 solidlsp:load_cache:1642 - Loaded 1880 document symbols from cache.
+INFO  2025-08-21 00:06:44,612 serena.agent:reset_language_server:589 - Starting the language server for moi
+INFO  2025-08-21 00:06:44,612 solidlsp:start:1684 - Starting language server with language typescript for /Users/ninh/Library/Mobile Documents/com~apple~CloudDocs/web app/moi
+INFO  2025-08-21 00:06:44,613 solidlsp:_start_server:224 - Starting TypeScript server process
+INFO  2025-08-21 00:06:44,613 solidlsp.ls_handler:start:189 - Starting language server process via command: ['/Users/ninh/.serena/language_servers/static/TypeScriptLanguageServer/ts-lsp/node_modules/.bin/typescript-language-server', '--stdio']
+INFO  2025-08-21 00:06:44,621 solidlsp:_start_server:228 - Sending initialize request from LSP client to LSP server and awaiting response
+INFO  2025-08-21 00:06:44,697 solidlsp:window_log_message:207 - LSP: window/logMessage: {"type": 3, "message": "Using Typescript version (bundled) 5.5.4 from path "/Users/ninh/.serena/language_servers/static/TypeScriptLanguageServer/ts-lsp/node_modules/typescript/lib/tsserver.js""}
+INFO  2025-08-21 00:06:44,711 serena.cli:health_check:569 - Found analyzable file: comprehensive_debug.js
+INFO  2025-08-21 00:06:44,711 serena.cli:health_check:587 - Testing GetSymbolsOverviewTool on file: comprehensive_debug.js
+INFO  2025-08-21 00:06:44,711 serena.agent:issue_task:416 - Scheduling Task-2[<lambda>]
+INFO  2025-08-21 00:06:45,702 solidlsp:_start_server:246 - Timeout waiting for TypeScript server to become ready, proceeding anyway
+INFO  2025-08-21 00:06:45,702 serena.agent:stop:336 - Language server initialization completed in 1.804 seconds
+INFO  2025-08-21 00:06:45,702 serena.agent:stop:336 - Task-1[init_language_server] completed in 1.804 seconds
+INFO  2025-08-21 00:06:45,702 serena.agent:start:329 - Task-2[<lambda>] starting ...
+INFO  2025-08-21 00:06:45,706 serena.agent:stop:336 - Task-2[<lambda>] completed in 0.004 seconds
+INFO  2025-08-21 00:06:45,707 serena.cli:health_check:590 - GetSymbolsOverviewTool returned 4 symbols
+INFO  2025-08-21 00:06:45,707 serena.cli:health_check:615 - Using symbol for testing: comprehensiveDebug (kind: 12)
+INFO  2025-08-21 00:06:45,707 serena.cli:health_check:618 - Testing FindSymbolTool for symbol: comprehensiveDebug
+INFO  2025-08-21 00:06:45,707 serena.agent:issue_task:416 - Scheduling Task-3[<lambda>]
+INFO  2025-08-21 00:06:45,707 serena.agent:start:329 - Task-3[<lambda>] starting ...
+INFO  2025-08-21 00:06:45,708 serena.agent:stop:336 - Task-3[<lambda>] completed in 0.001 seconds
+INFO  2025-08-21 00:06:45,708 serena.cli:health_check:623 - FindSymbolTool found 2 matches for symbol comprehensiveDebug
+INFO  2025-08-21 00:06:45,708 serena.cli:health_check:626 - Testing FindReferencingSymbolsTool for symbol: comprehensiveDebug
+INFO  2025-08-21 00:06:45,708 serena.agent:issue_task:416 - Scheduling Task-4[<lambda>]
+INFO  2025-08-21 00:06:45,708 serena.agent:start:329 - Task-4[<lambda>] starting ...
+ERROR 2025-08-21 00:06:45,709 serena.symbol:find_referencing_symbols:526 - Found 2 symbols with name comprehensiveDebug in file comprehensive_debug.js.May be an overwritten variable, in which case you can ignore this error. Proceeding with the first one. Found symbols for name_path='comprehensiveDebug' in relative_file_path='comprehensive_debug.js': 
+[
+  {
+    "relative_path": "comprehensive_debug.js",
+    "line": 6,
+    "column": 15
+  },
+  {
+    "relative_path": "comprehensive_debug.js",
+    "line": 311,
+    "column": 19
+  }
+]
+WARNING 2025-08-21 00:06:46,757 solidlsp:request_referencing_symbols:1362 - Could not find containing symbol for comprehensive_debug.js:308:4. Returning file symbol instead
+WARNING 2025-08-21 00:06:46,760 solidlsp:request_referencing_symbols:1362 - Could not find containing symbol for comprehensive_debug.js:311:19. Returning file symbol instead
+INFO  2025-08-21 00:06:46,761 serena.agent:stop:336 - Task-4[<lambda>] completed in 1.052 seconds
+INFO  2025-08-21 00:06:46,761 serena.cli:health_check:630 - FindReferencingSymbolsTool found 2 references for symbol comprehensiveDebug
+INFO  2025-08-21 00:06:46,761 serena.cli:health_check:636 - Testing SearchForPatternTool for pattern: comprehensiveDebug
+INFO  2025-08-21 00:06:46,761 serena.agent:issue_task:416 - Scheduling Task-5[<lambda>]
+INFO  2025-08-21 00:06:46,762 serena.agent:start:329 - Task-5[<lambda>] starting ...
+INFO  2025-08-21 00:06:46,860 serena.text_utils:search_files:326 - Processing 2631 files.
+INFO  2025-08-21 00:06:47,129 serena.text_utils:search_files:367 - Found 3 total matches across 2631 files
+INFO  2025-08-21 00:06:47,130 serena.agent:stop:336 - Task-5[<lambda>] completed in 0.368 seconds
+INFO  2025-08-21 00:06:47,130 serena.cli:health_check:643 - SearchForPatternTool found 3 pattern matches for comprehensiveDebug
+INFO  2025-08-21 00:06:47,130 serena.cli:health_check:657 - Health check completed successfully
