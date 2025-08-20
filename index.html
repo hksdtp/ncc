@@ -706,30 +706,21 @@
                     <input type="file" id="importTexts" accept=".json" class="w-full p-2 border rounded-lg">
                 </div>
 
-                <!-- Supabase Configuration -->
+                <!-- Cloud Storage Management -->
                 <div>
-                    <h4 class="editable font-medium mb-3" data-key="supabase-title">Cấu Hình Supabase</h4>
+                    <h4 class="editable font-medium mb-3" data-key="cloud-storage-title">Quản Lý Cloud Storage</h4>
                     <div class="space-y-3">
-                        <div>
-                            <label class="block text-sm font-medium mb-1">Supabase URL:</label>
-                            <input type="url" id="supabaseUrl" placeholder="https://xxx.supabase.co" class="w-full p-2 border rounded-lg text-sm">
+                        <div id="supabaseStatus" class="text-sm p-3 bg-green-50 border border-green-200 rounded-lg">
+                            <i class="fas fa-circle text-green-500 mr-1"></i>
+                            <span class="font-medium">Đã kết nối Supabase Cloud</span>
+                            <div class="text-xs text-green-600 mt-1">Ảnh và dữ liệu được lưu trữ an toàn trên cloud</div>
                         </div>
-                        <div>
-                            <label class="block text-sm font-medium mb-1">Anon Key:</label>
-                            <input type="password" id="supabaseKey" placeholder="eyJhbGciOiJIUzI1NiIs..." class="w-full p-2 border rounded-lg text-sm">
-                        </div>
-                        <button id="connectSupabase" class="w-full bg-green-500 text-white py-2 px-4 rounded-lg hover:bg-green-600 transition text-sm">
-                            <i class="fas fa-plug mr-2"></i>Kết Nối Supabase
-                        </button>
-                        <button id="syncToSupabase" class="w-full bg-blue-500 text-white py-2 px-4 rounded-lg hover:bg-blue-600 transition text-sm" disabled>
+                        <button id="syncToSupabase" class="w-full bg-blue-500 text-white py-2 px-4 rounded-lg hover:bg-blue-600 transition text-sm">
                             <i class="fas fa-sync mr-2"></i>Đồng Bộ Dữ Liệu
                         </button>
-                        <button id="uploadAllMedia" class="w-full bg-purple-500 text-white py-2 px-4 rounded-lg hover:bg-purple-600 transition text-sm" disabled>
+                        <button id="uploadAllMedia" class="w-full bg-purple-500 text-white py-2 px-4 rounded-lg hover:bg-purple-600 transition text-sm">
                             <i class="fas fa-cloud-upload-alt mr-2"></i>Upload Tất Cả Ảnh
                         </button>
-                        <div id="supabaseStatus" class="text-sm text-gray-500">
-                            <i class="fas fa-circle text-red-500 mr-1"></i>Chưa kết nối
-                        </div>
                     </div>
                 </div>
 
@@ -987,9 +978,9 @@
     </div>
 
     <script>
-        // Supabase Configuration
-        const SUPABASE_URL = 'YOUR_SUPABASE_URL'; // Replace with your Supabase URL
-        const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY'; // Replace with your Supabase anon key
+        // Supabase Configuration - Auto-configured
+        const SUPABASE_URL = 'https://hukhojlhmvpjmiyageqg.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh1a2hvamxobXZwam1peWFnZXFnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU2ODAwMTQsImV4cCI6MjA3MTI1NjAxNH0.g6KFGNEYtxxvjhc48m1Z3RLwW96g8_j3yPkv_Ly1zo8';
         
         let supabase;
         let isSupabaseConnected = false;
@@ -1566,8 +1557,7 @@
             loadSavedData();
             loadMediaFromStorage();
             
-            // Load Supabase credentials and initialize
-            loadSupabaseCredentials();
+            // Supabase auto-initialized on page load
             
             // Load data from Supabase if available
             setTimeout(() => {
@@ -2155,38 +2145,8 @@
             });
         });
 
-        // Supabase Settings Event Handlers
-        document.getElementById('connectSupabase').addEventListener('click', function() {
-            const url = document.getElementById('supabaseUrl').value.trim();
-            const key = document.getElementById('supabaseKey').value.trim();
-            
-            if (!url || !key) {
-                showNotification('Vui lòng nhập đầy đủ URL và Anon Key', 'error');
-                return;
-            }
-            
-            try {
-                supabase = window.supabase.createClient(url, key);
-                isSupabaseConnected = true;
-                
-                // Save to localStorage
-                localStorage.setItem('supabaseUrl', url);
-                localStorage.setItem('supabaseKey', key);
-                
-                // Update UI
-                updateSupabaseStatus(true);
-                showNotification('Đã kết nối Supabase thành công!', 'success');
-                
-                // Auto-sync after connection
-                setTimeout(() => {
-                    syncAllDataToSupabase();
-                }, 1000);
-                
-            } catch (error) {
-                showNotification('Lỗi kết nối Supabase: ' + error.message, 'error');
-                updateSupabaseStatus(false);
-            }
-        });
+        // Auto-initialize Supabase on page load
+        // No manual connection needed - automatically configured
         
         document.getElementById('syncToSupabase').addEventListener('click', function() {
             if (isSupabaseConnected) {
@@ -2208,51 +2168,36 @@
             const statusElement = document.getElementById('supabaseStatus');
             const syncButton = document.getElementById('syncToSupabase');
             const uploadButton = document.getElementById('uploadAllMedia');
-            
+
             if (connected) {
-                statusElement.innerHTML = '<i class="fas fa-circle text-green-500 mr-1"></i>Đã kết nối';
-                
+                // Status is already set in HTML as connected
                 syncButton.disabled = false;
                 syncButton.classList.remove('bg-gray-400');
                 syncButton.classList.add('bg-blue-500', 'hover:bg-blue-600');
-                
+
                 uploadButton.disabled = false;
                 uploadButton.classList.remove('bg-gray-400');
                 uploadButton.classList.add('bg-purple-500', 'hover:bg-purple-600');
             } else {
-                statusElement.innerHTML = '<i class="fas fa-circle text-red-500 mr-1"></i>Chưa kết nối';
-                
+                // Fallback if connection fails
+                statusElement.innerHTML = `
+                    <i class="fas fa-circle text-red-500 mr-1"></i>
+                    <span class="font-medium">Lỗi kết nối Supabase</span>
+                    <div class="text-xs text-red-600 mt-1">Vui lòng kiểm tra kết nối internet</div>
+                `;
+                statusElement.className = 'text-sm p-3 bg-red-50 border border-red-200 rounded-lg';
+
                 syncButton.disabled = true;
                 syncButton.classList.add('bg-gray-400');
                 syncButton.classList.remove('bg-blue-500', 'hover:bg-blue-600');
-                
+
                 uploadButton.disabled = true;
                 uploadButton.classList.add('bg-gray-400');
                 uploadButton.classList.remove('bg-purple-500', 'hover:bg-purple-600');
             }
         }
         
-        // Load saved Supabase credentials
-        function loadSupabaseCredentials() {
-            const savedUrl = localStorage.getItem('supabaseUrl');
-            const savedKey = localStorage.getItem('supabaseKey');
-            
-            if (savedUrl && savedKey) {
-                document.getElementById('supabaseUrl').value = savedUrl;
-                document.getElementById('supabaseKey').value = savedKey;
-                
-                // Auto-connect if credentials exist
-                try {
-                    supabase = window.supabase.createClient(savedUrl, savedKey);
-                    isSupabaseConnected = true;
-                    updateSupabaseStatus(true);
-                    console.log('Auto-connected to Supabase using saved credentials');
-                } catch (error) {
-                    console.error('Failed to auto-connect to Supabase:', error);
-                    updateSupabaseStatus(false);
-                }
-            }
-        }
+        // Supabase is now auto-configured - no manual setup needed
 
         // Auto-save when page is about to be closed
         window.addEventListener('beforeunload', function() {
