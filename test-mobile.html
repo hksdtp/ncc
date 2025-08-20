@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Mobile Layout</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+            background: #f5f5f5;
+        }
+        
+        .test-container {
+            max-width: 400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            padding: 20px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        
+        .media-grid {
+            columns: 2;
+            column-gap: 0.75rem;
+            margin-bottom: 2rem;
+        }
+        
+        .media-item {
+            display: inline-block;
+            width: 100%;
+            margin-bottom: 1rem;
+            border-radius: 16px;
+            overflow: hidden;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            background: white;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            break-inside: avoid;
+        }
+        
+        .media-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+        }
+        
+        .media-item img {
+            width: 100%;
+            height: auto;
+            display: block;
+            border-radius: 16px;
+        }
+        
+        .play-icon {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+        }
+        
+        @media (max-width: 480px) {
+            .media-grid {
+                columns: 1;
+                column-gap: 0.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h2>Test Pinterest Layout</h2>
+        <div class="media-grid">
+            <div class="media-item">
+                <img src="https://picsum.photos/200/300" alt="Test 1">
+            </div>
+            <div class="media-item">
+                <img src="https://picsum.photos/200/400" alt="Test 2">
+            </div>
+            <div class="media-item">
+                <img src="https://picsum.photos/200/250" alt="Test 3">
+                <div class="play-icon">▶</div>
+            </div>
+            <div class="media-item">
+                <img src="https://picsum.photos/200/350" alt="Test 4">
+            </div>
+            <div class="media-item">
+                <img src="https://picsum.photos/200/280" alt="Test 5">
+            </div>
+            <div class="media-item">
+                <img src="https://picsum.photos/200/320" alt="Test 6">
+                <div class="play-icon">▶</div>
+            </div>
+        </div>
+        
+        <p><strong>Kiểm tra:</strong></p>
+        <ul>
+            <li>✅ Layout Pinterest (masonry)</li>
+            <li>✅ Responsive design</li>
+            <li>✅ Video play icon</li>
+            <li>✅ Hover effects</li>
+        </ul>
+    </div>
+</body>
+</html>
