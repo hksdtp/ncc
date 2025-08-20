@@ -1085,8 +1085,18 @@
 
     <script>
         // App Version for cache busting
-        const APP_VERSION = '2.1.0-pinterest';
-        console.log(`Shanghai Supplier Catalog v${APP_VERSION} - Pinterest Style`);
+        const APP_VERSION = '2.2.0-fixed';
+        const BUILD_TIME = new Date().toISOString();
+        console.log(`Shanghai Supplier Catalog v${APP_VERSION} - Pinterest Style - Built: ${BUILD_TIME}`);
+
+        // Force cache refresh
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.getRegistrations().then(function(registrations) {
+                for(let registration of registrations) {
+                    registration.unregister();
+                }
+            });
+        }
 
         // Supabase Configuration - Auto-configured
         const SUPABASE_URL = 'https://hukhojlhmvpjmiyageqg.supabase.co';
@@ -1123,8 +1133,10 @@
                     localStorage.removeItem('supabaseUrl');
                     localStorage.removeItem('supabaseKey');
 
-                    // Auto-sync data on load
-                    syncAllDataToSupabase();
+                    // Auto-sync data on load with delay
+                    setTimeout(() => {
+                        syncAllDataToSupabase();
+                    }, 2000);
                 } else {
                     console.log('Supabase not configured. Using localStorage only.');
                     updateSupabaseStatus(false);
@@ -1174,7 +1186,7 @@
                 
                 // Upload to Supabase Storage
                 const { data, error } = await supabase.storage
-                    .from('supplier-media')
+                    .from('supplier-media-public')
                     .upload(fileName, blob, {
                         cacheControl: '3600',
                         upsert: false
@@ -1187,7 +1199,7 @@
                 
                 // Get public URL
                 const { data: publicData } = supabase.storage
-                    .from('supplier-media')
+                    .from('supplier-media-public')
                     .getPublicUrl(fileName);
                 
                 // Update media item with Supabase info
@@ -1656,8 +1668,9 @@
             document.getElementById('fullscreenMedia').innerHTML = '';
         }
 
-        // Delete media item function - Global scope
+        // Delete media item function - Global scope with debugging
         window.deleteMediaItem = async function(index) {
+            console.log('deleteMediaItem called with index:', index);
             if (!currentSupplierId) return;
 
             const mediaItems = supplierMedia[currentSupplierId];
@@ -1703,7 +1716,7 @@
 
             try {
                 const { error } = await supabase.storage
-                    .from('supplier-media')
+                    .from('supplier-media-public')
                     .remove([filePath]);
 
                 if (error) {
