@@ -804,6 +804,30 @@
                 <!-- Cloud Storage Management -->
 
 
+                <!-- Cross-Device Status -->
+                <div>
+                    <h4 class="editable font-medium mb-3" data-key="cross-device-title">Trạng Thái Cross-Device</h4>
+                    <div class="mb-4 p-3 bg-gradient-to-r from-blue-50 to-green-50 border border-blue-200 rounded-lg">
+                        <div class="grid grid-cols-3 gap-2 text-xs">
+                            <div class="text-center">
+                                <div id="localCount" class="font-bold text-gray-600">0</div>
+                                <div class="text-gray-500">Local</div>
+                            </div>
+                            <div class="text-center">
+                                <div id="cloudCount" class="font-bold text-green-600">0</div>
+                                <div class="text-green-600">Cloud</div>
+                            </div>
+                            <div class="text-center">
+                                <div id="syncedCount" class="font-bold text-blue-600">0</div>
+                                <div class="text-blue-600">Synced</div>
+                            </div>
+                        </div>
+                        <div class="mt-2 text-xs text-center">
+                            <div id="crossDeviceStatus" class="font-medium">Đang kiểm tra...</div>
+                        </div>
+                    </div>
+                </div>
+
                 <div>
                     <h4 class="editable font-medium mb-3" data-key="cloud-storage-title">Quản Lý Cloud Storage</h4>
                     <div class="space-y-3">
@@ -1090,13 +1114,14 @@
 
     <script>
         // App Version for cache busting
-        const APP_VERSION = '3.0.0-stable-local';
+        const APP_VERSION = '3.1.0-cross-device-optimized';
         const BUILD_TIME = new Date().toISOString();
-        console.log(`💾 LOCAL STORAGE v${APP_VERSION} - Built: ${BUILD_TIME}`);
+        console.log(`📱 CROSS-DEVICE OPTIMIZED v${APP_VERSION} - Built: ${BUILD_TIME}`);
 
-        // Simple Local Storage Mode - No SMB complexity
-        console.log('📁 Storage Mode: LOCAL ONLY');
-        console.log('💾 All data stored locally with Supabase sync');
+        // Smart Cross-Device Storage
+        console.log('📁 Storage Mode: SMART HYBRID');
+        console.log('🌐 Priority: Supabase Cloud → Local Fallback');
+        console.log('📱 Cross-device access enabled via Supabase Storage');
 
         // FORCE CACHE CLEAR
         const timestamp = Date.now();
@@ -1164,7 +1189,50 @@
         console.log('✅ deleteMediaItem function defined globally');
         console.log('🔍 Testing function availability:', typeof window.deleteMediaItem);
 
-        // Simple Local Storage - No SMB complexity
+        // Cross-Device Status Management
+        function updateCrossDeviceStatus() {
+            let localCount = 0;
+            let cloudCount = 0;
+            let syncedCount = 0;
+
+            // Count images by storage type
+            Object.values(supplierMedia).forEach(mediaItems => {
+                mediaItems.forEach(item => {
+                    if (item.uploaded_to_supabase && item.supabase_url) {
+                        cloudCount++;
+                    } else if (item.url.startsWith('http')) {
+                        syncedCount++;
+                    } else {
+                        localCount++;
+                    }
+                });
+            });
+
+            // Update UI
+            document.getElementById('localCount').textContent = localCount;
+            document.getElementById('cloudCount').textContent = cloudCount;
+            document.getElementById('syncedCount').textContent = syncedCount;
+
+            // Update status message
+            const statusEl = document.getElementById('crossDeviceStatus');
+            const totalImages = localCount + cloudCount + syncedCount;
+
+            if (totalImages === 0) {
+                statusEl.textContent = 'Chưa có ảnh nào';
+                statusEl.className = 'font-medium text-gray-500';
+            } else if (cloudCount === totalImages) {
+                statusEl.textContent = '✅ Tất cả ảnh có thể xem cross-device';
+                statusEl.className = 'font-medium text-green-600';
+            } else if (localCount === totalImages) {
+                statusEl.textContent = '⚠️ Ảnh chỉ có trên thiết bị này';
+                statusEl.className = 'font-medium text-orange-600';
+            } else {
+                statusEl.textContent = `📊 ${cloudCount + syncedCount}/${totalImages} ảnh cross-device`;
+                statusEl.className = 'font-medium text-blue-600';
+            }
+
+            console.log('📊 Cross-device status:', { localCount, cloudCount, syncedCount, totalImages });
+        }
 
         // Supabase Configuration - Auto-configured
         const SUPABASE_URL = 'https://hukhojlhmvpjmiyageqg.supabase.co';
@@ -1531,10 +1599,27 @@
                 if (mediaError) throw mediaError;
                 
                 if (mediaData && mediaData.length > 0) {
+                    console.log('📥 Loading media data from Supabase:', mediaData.length, 'suppliers');
                     mediaData.forEach(item => {
-                        supplierMedia[item.supplier_id] = item.media_items || [];
+                        const mediaItems = item.media_items || [];
+                        console.log(`📁 Supplier ${item.supplier_id}:`, mediaItems.length, 'media items');
+
+                        // Prioritize Supabase URLs for cross-device access
+                        mediaItems.forEach(media => {
+                            if (media.supabase_url && !media.url.startsWith('http')) {
+                                console.log('🔄 Using Supabase URL for cross-device access:', media.name);
+                                media.url = media.supabase_url; // Use cloud URL as primary
+                            }
+                        });
+
+                        supplierMedia[item.supplier_id] = mediaItems;
                     });
                     saveMediaToStorage();
+
+                    // Count total images loaded and update cross-device status
+                    const totalImages = Object.values(supplierMedia).reduce((sum, items) => sum + items.length, 0);
+                    console.log('📊 Total images loaded:', totalImages);
+                    updateCrossDeviceStatus();
                 }
                 
                 showNotification('Dữ liệu đã được tải từ Supabase', 'success');
@@ -1710,13 +1795,18 @@
                 
                 mediaGrid.innerHTML = media.map((item, index) => {
                     const isVideo = item.type.startsWith('video/');
-                    // Simple URL selection - local first, then Supabase
+                    // Smart URL selection - prioritize cloud for cross-device access
                     const imageUrl = item.supabase_url || item.url;
 
-                    // Simple upload status
-                    const uploadStatus = item.uploaded_to_supabase ?
-                        '<div class="absolute top-2 right-2 bg-green-500 text-white text-xs px-2 py-1 rounded-full"><i class="fas fa-cloud mr-1"></i>Cloud</div>' :
-                        '<div class="absolute top-2 right-2 bg-gray-500 text-white text-xs px-2 py-1 rounded-full"><i class="fas fa-hdd mr-1"></i>Local</div>';
+                    // Enhanced upload status with cross-device info
+                    let uploadStatus = '';
+                    if (item.uploaded_to_supabase && item.supabase_url) {
+                        uploadStatus = '<div class="absolute top-2 right-2 bg-green-500 text-white text-xs px-2 py-1 rounded-full" title="Có thể xem từ mọi thiết bị"><i class="fas fa-cloud mr-1"></i>Cloud</div>';
+                    } else if (item.url.startsWith('http')) {
+                        uploadStatus = '<div class="absolute top-2 right-2 bg-blue-500 text-white text-xs px-2 py-1 rounded-full" title="Đã đồng bộ từ cloud"><i class="fas fa-sync mr-1"></i>Synced</div>';
+                    } else {
+                        uploadStatus = '<div class="absolute top-2 right-2 bg-gray-500 text-white text-xs px-2 py-1 rounded-full" title="Chỉ có trên thiết bị này"><i class="fas fa-hdd mr-1"></i>Local</div>';
+                    }
                     
                     return `
                         <div class="media-item relative group" onclick="openFullscreenViewer(${index})">
@@ -1808,18 +1898,33 @@
                         supplierMedia[currentSupplierId].push(mediaItem);
                         saveMediaToStorage();
                         renderMediaGrid();
+                        updateCrossDeviceStatus(); // Update cross-device status
                         showNotification(`Đã tải lên ${file.name} thành công!`);
                         
-                        // Simple Local Storage
-                        console.log('💾 Saved to local storage:', file.name);
-                        showNotification('✅ Ảnh đã lưu cục bộ', 'success');
-
-                        // Sync metadata to database if connected
+                        // Smart Storage: Try Supabase first, fallback to local
                         if (isSupabaseConnected) {
-                            console.log('📊 Syncing metadata to database...');
-                            syncMediaToSupabase(currentSupplierId, supplierMedia[currentSupplierId]).catch(error => {
-                                console.warn('⚠️ Metadata sync failed:', error);
+                            console.log('🔄 Uploading to Supabase Storage for cross-device access...');
+                            uploadSingleMediaToSupabase(currentSupplierId, mediaItem).then(uploadedItem => {
+                                if (uploadedItem) {
+                                    console.log('✅ Supabase upload successful:', uploadedItem.supabase_url);
+                                    // Update local storage with Supabase info
+                                    saveMediaToStorage();
+                                    // Refresh display to show cloud status
+                                    renderMediaGrid();
+                                    // Sync metadata to database
+                                    syncMediaToSupabase(currentSupplierId, supplierMedia[currentSupplierId]);
+                                    showNotification('✅ Ảnh đã upload lên cloud - có thể xem từ mọi thiết bị!', 'success');
+                                } else {
+                                    console.error('❌ Supabase upload failed, using local storage');
+                                    showNotification('⚠️ Upload cloud thất bại, ảnh lưu cục bộ', 'warning');
+                                }
+                            }).catch(error => {
+                                console.error('❌ Upload error:', error);
+                                showNotification('⚠️ Lỗi upload cloud: ' + error.message + ' - Ảnh lưu cục bộ', 'warning');
                             });
+                        } else {
+                            console.log('💾 Supabase not connected - saved to local storage only');
+                            showNotification('💾 Ảnh đã lưu cục bộ (chưa kết nối cloud)', 'info');
                         }
                     };
                     reader.readAsDataURL(file);
