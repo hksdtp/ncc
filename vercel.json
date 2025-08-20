@@ -1,0 +1,27 @@
+{
+  "routes": [
+    {
+      "src": "/",
+      "dest": "/shanghai_catalog_source_code.html"
+    },
+    {
+      "src": "/index.html",
+      "dest": "/shanghai_catalog_source_code.html"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/shanghai_catalog_source_code.html"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=0, must-revalidate"
+        }
+      ]
+    }
+  ]
+}
