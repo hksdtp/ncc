@@ -169,21 +169,64 @@ sudo chmod -R 755 /mnt/smb-storage
 - **Streaming**: Large files streamed efficiently
 - **Compression**: JPEG quality 85%
 
+## 📱 Cross-Device Access
+
+File server tự động detect IP và cho phép truy cập từ mọi thiết bị:
+
+### Server sẽ hiển thị:
+```
+🚀 SMB File Server running on 0.0.0.0:8080
+🌐 Server IP: 192.168.1.100
+🔗 Access URLs:
+   Local: http://localhost:8080/ping
+   Network: http://192.168.1.100:8080/ping
+📱 Cross-device access enabled!
+```
+
+### Web App tự động detect:
+- Thử `localhost:8080` trước
+- Nếu không được, thử các IP phổ biến
+- Hiển thị server URL đã kết nối
+- Ảnh có thể xem từ mọi thiết bị
+
+### Firewall Settings:
+```bash
+# Linux: Mở port 8080
+sudo ufw allow 8080
+
+# Windows: Windows Defender Firewall
+# Add inbound rule for port 8080
+
+# macOS: System Preferences > Security & Privacy > Firewall
+# Add Node.js to allowed apps
+```
+
 ## 🔄 Integration với Web App
 
-Update web app để sử dụng file server:
+Web app tự động integrate với file server:
 
 ```javascript
-// Upload
-const formData = new FormData();
-formData.append('file', file);
-formData.append('supplierId', supplierId);
+// Auto-detect server URL
+const serverUrl = await detectFileServerUrl();
 
-const response = await fetch('http://localhost:8080/upload', {
+// Upload với cross-device support
+const response = await fetch(`${serverUrl}/upload`, {
     method: 'POST',
     body: formData
 });
 
-// Display
-const imageUrl = 'http://localhost:8080/files/supplier-media/supplier1/image.jpg';
+// Display images từ network URL
+const imageUrl = `${serverUrl}/files/supplier-media/supplier1/image.jpg`;
 ```
+
+## 🌐 Network Requirements
+
+### Cùng mạng WiFi/LAN:
+- ✅ Tất cả thiết bị cùng router
+- ✅ File server và web app cùng subnet
+- ✅ Port 8080 không bị block
+
+### Khác mạng:
+- 🔧 Cần port forwarding trên router
+- 🔧 Hoặc VPN connection
+- 🔧 Hoặc cloud deployment

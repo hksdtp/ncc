@@ -9,9 +9,13 @@ set SMB_HOST=222.252.23.248
 set SMB_SHARE=script
 set DRIVE_LETTER=Z:
 
-REM Prompt for credentials
-set /p SMB_USERNAME="Enter Username: "
-set /p SMB_PASSWORD="Enter Password: "
+REM SMB Credentials (pre-configured)
+set SMB_USERNAME=haininh
+set SMB_PASSWORD=Villad24@
+
+echo Using SMB credentials:
+echo Username: %SMB_USERNAME%
+echo Password: [HIDDEN]
 
 echo.
 echo 📁 Mapping network drive %DRIVE_LETTER% to \\%SMB_HOST%\%SMB_SHARE%

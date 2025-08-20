@@ -10,11 +10,13 @@ SMB_HOST="222.252.23.248"
 SMB_SHARE="script"
 MOUNT_POINT="/mnt/smb-storage"
 
-# Prompt for credentials
-echo "📝 Enter SMB credentials:"
-read -p "Username: " SMB_USERNAME
-read -s -p "Password: " SMB_PASSWORD
-echo
+# SMB Credentials (pre-configured)
+SMB_USERNAME="haininh"
+SMB_PASSWORD="Villad24@"
+
+echo "📝 Using SMB credentials:"
+echo "Username: $SMB_USERNAME"
+echo "Password: [HIDDEN]"
 
 # Create mount point
 echo "📁 Creating mount point: $MOUNT_POINT"

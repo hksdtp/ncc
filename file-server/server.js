@@ -12,10 +12,14 @@ const PORT = process.env.PORT || 8080;
 const SMB_CONFIG = {
     host: '222.252.23.248',
     share: 'script',
-    username: process.env.SMB_USERNAME || 'your_username',
-    password: process.env.SMB_PASSWORD || 'your_password',
-    mountPoint: process.env.SMB_MOUNT || '/mnt/smb-storage' // Linux/macOS
+    username: process.env.SMB_USERNAME || 'haininh',
+    password: process.env.SMB_PASSWORD || 'Villad24@',
+    mountPoint: process.env.SMB_MOUNT || '/mnt/smb-storage', // Linux/macOS
     // Windows: 'Z:\\' hoặc '\\\\222.252.23.248\\script'
+
+    // Network configuration for cross-device access
+    serverHost: process.env.SERVER_HOST || '0.0.0.0', // Listen on all interfaces
+    serverPort: process.env.PORT || 8080
 };
 
 // Middleware
@@ -119,8 +123,9 @@ app.post('/upload', upload.single('file'), async (req, res) => {
         // Write file to SMB storage
         await fs.writeFile(filePath, fileBuffer);
         
-        // Generate public URL
-        const publicUrl = `http://localhost:${PORT}/files/supplier-media/${supplierId || 'default'}/${uniqueFileName}`;
+        // Generate public URL - Use actual server IP for cross-device access
+        const serverIP = getServerIP();
+        const publicUrl = `http://${serverIP}:${SMB_CONFIG.serverPort}/files/supplier-media/${supplierId || 'default'}/${uniqueFileName}`;
         
         console.log('✅ File uploaded successfully:', filePath);
         
@@ -236,7 +241,7 @@ app.get('/list/:supplierId?', async (req, res) => {
                     name: file,
                     size: stats.size,
                     modified: stats.mtime,
-                    url: `http://localhost:${PORT}/files/supplier-media/${supplierId}/${file}`
+                    url: `http://${getServerIP()}:${SMB_CONFIG.serverPort}/files/supplier-media/${supplierId}/${file}`
                 });
             }
         }
@@ -270,6 +275,24 @@ app.use((error, req, res, next) => {
     });
 });
 
+// Get server IP for cross-device access
+function getServerIP() {
+    const os = require('os');
+    const interfaces = os.networkInterfaces();
+
+    // Try to find the main network interface
+    for (const name of Object.keys(interfaces)) {
+        for (const iface of interfaces[name]) {
+            // Skip internal and non-IPv4 addresses
+            if (!iface.internal && iface.family === 'IPv4') {
+                return iface.address;
+            }
+        }
+    }
+
+    return 'localhost'; // Fallback
+}
+
 // Start server
 async function startServer() {
     // Check SMB mount
@@ -277,14 +300,20 @@ async function startServer() {
     if (!smbReady) {
         console.warn('⚠️ SMB mount not ready, but server will start anyway');
     }
-    
-    app.listen(PORT, () => {
-        console.log(`🚀 SMB File Server running on port ${PORT}`);
+
+    const serverIP = getServerIP();
+
+    app.listen(SMB_CONFIG.serverPort, SMB_CONFIG.serverHost, () => {
+        console.log(`🚀 SMB File Server running on ${SMB_CONFIG.serverHost}:${SMB_CONFIG.serverPort}`);
         console.log(`📁 SMB Storage: ${SMB_CONFIG.host}/${SMB_CONFIG.share}`);
         console.log(`📂 Mount Point: ${SMB_CONFIG.mountPoint}`);
-        console.log(`🌐 Health Check: http://localhost:${PORT}/ping`);
-        console.log(`📤 Upload: POST http://localhost:${PORT}/upload`);
-        console.log(`📥 Files: GET http://localhost:${PORT}/files/*`);
+        console.log(`🌐 Server IP: ${serverIP}`);
+        console.log(`🔗 Access URLs:`);
+        console.log(`   Local: http://localhost:${SMB_CONFIG.serverPort}/ping`);
+        console.log(`   Network: http://${serverIP}:${SMB_CONFIG.serverPort}/ping`);
+        console.log(`📤 Upload: POST http://${serverIP}:${SMB_CONFIG.serverPort}/upload`);
+        console.log(`📥 Files: GET http://${serverIP}:${SMB_CONFIG.serverPort}/files/*`);
+        console.log(`📱 Cross-device access enabled!`);
     });
 }
 

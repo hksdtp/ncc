@@ -814,8 +814,8 @@
                             </label>
                         </div>
                         <div class="text-xs text-gray-600">
-                            <div>📁 SMB: smb://222.252.23.248/</div>
-                            <div>🌐 Server: http://localhost:8080</div>
+                            <div>📁 SMB: smb://haininh@222.252.23.248/</div>
+                            <div id="serverUrl">🌐 Server: Detecting...</div>
                             <div id="smbStatus" class="mt-1 font-medium">❌ Chưa kết nối</div>
                         </div>
                         <button id="testSmbServer" class="w-full mt-2 bg-blue-500 text-white py-1 px-2 rounded text-xs hover:bg-blue-600">
@@ -1114,14 +1114,32 @@
         const BUILD_TIME = new Date().toISOString();
         console.log(`🚀 SMB INTEGRATION v${APP_VERSION} - Built: ${BUILD_TIME}`);
 
-        // SMB File Server Configuration
+        // SMB File Server Configuration - Auto-detect server IP
         const FILE_SERVER_CONFIG = {
             enabled: false, // Set to true when file server is running
-            baseUrl: 'http://localhost:8080',
+            baseUrl: '', // Will be auto-detected
             uploadEndpoint: '/upload',
             filesEndpoint: '/files',
-            deleteEndpoint: '/files'
+            deleteEndpoint: '/files',
+            port: 8080
         };
+
+        // Auto-detect file server URL for cross-device access
+        function detectFileServerUrl() {
+            // Try different possible server IPs
+            const possibleHosts = [
+                'localhost',
+                '192.168.1.100', // Common router IP range
+                '192.168.0.100',
+                '10.0.0.100',
+                window.location.hostname // Same host as web app
+            ];
+
+            return `http://${possibleHosts[0]}:${FILE_SERVER_CONFIG.port}`;
+        }
+
+        // Initialize file server URL
+        FILE_SERVER_CONFIG.baseUrl = detectFileServerUrl();
 
         // Storage Mode Selection
         const STORAGE_MODE = FILE_SERVER_CONFIG.enabled ? 'smb' : 'local';
@@ -1274,10 +1292,39 @@
 
                 const result = await response.json();
                 console.log('✅ File server is running:', result);
+
+                // Update UI with actual server URL
+                document.getElementById('serverUrl').innerHTML = `🌐 Server: ${FILE_SERVER_CONFIG.baseUrl}`;
+
                 return true;
 
             } catch (error) {
                 console.error('❌ File server not available:', error);
+
+                // Try to auto-detect alternative server URLs
+                const alternatives = [
+                    `http://192.168.1.100:${FILE_SERVER_CONFIG.port}`,
+                    `http://192.168.0.100:${FILE_SERVER_CONFIG.port}`,
+                    `http://10.0.0.100:${FILE_SERVER_CONFIG.port}`,
+                    `http://${window.location.hostname}:${FILE_SERVER_CONFIG.port}`
+                ];
+
+                for (const altUrl of alternatives) {
+                    try {
+                        console.log(`🔍 Trying alternative: ${altUrl}`);
+                        const altResponse = await fetch(`${altUrl}/ping`);
+                        if (altResponse.ok) {
+                            FILE_SERVER_CONFIG.baseUrl = altUrl;
+                            document.getElementById('serverUrl').innerHTML = `🌐 Server: ${altUrl}`;
+                            console.log('✅ Found file server at:', altUrl);
+                            return true;
+                        }
+                    } catch (altError) {
+                        // Continue trying
+                    }
+                }
+
+                document.getElementById('serverUrl').innerHTML = `🌐 Server: ❌ Not found`;
                 return false;
             }
         }
