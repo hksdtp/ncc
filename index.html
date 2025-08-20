@@ -1088,9 +1088,14 @@
 
     <script>
         // App Version for cache busting
-        const APP_VERSION = '2.5.0-critical-fixes';
+        const APP_VERSION = '2.6.0-emergency-fix';
         const BUILD_TIME = new Date().toISOString();
-        console.log(`Shanghai Supplier Catalog v${APP_VERSION} - Critical Bug Fixes - Built: ${BUILD_TIME}`);
+        console.log(`🚨 EMERGENCY FIX v${APP_VERSION} - Built: ${BUILD_TIME}`);
+
+        // FORCE CACHE CLEAR
+        const timestamp = Date.now();
+        document.documentElement.setAttribute('data-version', APP_VERSION);
+        document.documentElement.setAttribute('data-timestamp', timestamp);
 
         // Force cache refresh
         if ('serviceWorker' in navigator) {
@@ -1101,10 +1106,13 @@
             });
         }
 
-        // CRITICAL: Define deleteMediaItem function IMMEDIATELY
+        // CRITICAL: Define deleteMediaItem function IMMEDIATELY - EMERGENCY FIX
+        console.log('🚨 DEFINING deleteMediaItem FUNCTION NOW');
+
         window.deleteMediaItem = async function(index) {
-            console.log('🗑️ deleteMediaItem called with index:', index);
+            console.log('🗑️ EMERGENCY deleteMediaItem called with index:', index);
             console.log('📊 Current supplier:', currentSupplierId);
+            console.log('🔍 Function called at:', new Date().toISOString());
 
             if (!currentSupplierId) {
                 console.error('❌ No supplier selected');
@@ -1147,7 +1155,15 @@
             }
         };
 
-        console.log('✅ deleteMediaItem function defined globally');
+        console.log('✅ EMERGENCY deleteMediaItem function defined globally');
+        console.log('🔍 Testing function availability:', typeof window.deleteMediaItem);
+
+        // IMMEDIATE TEST
+        if (typeof window.deleteMediaItem === 'function') {
+            console.log('✅ deleteMediaItem is available as function');
+        } else {
+            console.error('❌ deleteMediaItem is NOT available');
+        }
 
         // Supabase Configuration - Auto-configured
         const SUPABASE_URL = 'https://hukhojlhmvpjmiyageqg.supabase.co';
@@ -1271,9 +1287,32 @@
                 const fileExtension = mediaItem.name.split('.').pop() || 'jpg';
                 const fileName = `supplier_${supplierId}/${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${fileExtension}`;
                 
+                // EMERGENCY: Try to create bucket if not exists
+                console.log('🚨 EMERGENCY UPLOAD - Checking buckets...');
+
+                // List all available buckets first
+                const { data: buckets, error: listError } = await supabase.storage.listBuckets();
+                console.log('📊 Available buckets:', buckets?.map(b => b.name) || 'none');
+
                 // Upload to Supabase Storage (try different bucket names)
                 let uploadResult;
                 let bucketName = 'media-uploads';
+
+                // If no buckets exist, try to create one
+                if (!buckets || buckets.length === 0) {
+                    console.log('🔧 No buckets found, trying to create media-uploads...');
+                    const { data: createResult, error: createError } = await supabase.storage.createBucket('media-uploads', {
+                        public: true,
+                        allowedMimeTypes: ['image/*', 'video/*'],
+                        fileSizeLimit: 52428800 // 50MB
+                    });
+
+                    if (createError) {
+                        console.error('❌ Failed to create bucket:', createError);
+                    } else {
+                        console.log('✅ Created bucket successfully:', createResult);
+                    }
+                }
 
                 // Try primary bucket first
                 uploadResult = await supabase.storage
