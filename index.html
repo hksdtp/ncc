@@ -1168,7 +1168,7 @@
                 if (mediaItem.supabase_path) {
                     try {
                         const { error } = await supabase.storage
-                            .from('media-uploads')
+                            .from('supplier-media')
                             .remove([mediaItem.supabase_path]);
 
                         if (error) {
@@ -1205,58 +1205,55 @@
 
                 console.log('📤 Uploading to Supabase Storage:', fileName);
 
-                // Try multiple bucket names for compatibility
-                let uploadResult;
-                let bucketName = 'media-uploads';
-
-                // Try primary bucket first
-                uploadResult = await supabase.storage
+                // Cloud-Only v4.0.0: Use standard bucket name from policies
+                const bucketName = 'supplier-media';
+                
+                // Ensure bucket exists and is public
+                const { data: buckets } = await supabase.storage.listBuckets();
+                const bucketExists = buckets?.some(bucket => bucket.name === bucketName);
+                
+                if (!bucketExists) {
+                    console.log('🔧 Creating bucket:', bucketName);
+                    const { error: createError } = await supabase.storage.createBucket(bucketName, {
+                        public: true,
+                        allowedMimeTypes: ['image/*', 'video/*'],
+                        fileSizeLimit: 52428800 // 50MB
+                    });
+                    
+                    if (createError && !createError.message.includes('already exists')) {
+                        throw new Error(`Failed to create bucket: ${createError.message}`);
+                    }
+                }
+                
+                // Single upload attempt - no fallbacks (Cloud-Only v4.0.0)
+                const uploadResult = await supabase.storage
                     .from(bucketName)
                     .upload(fileName, file, {
                         cacheControl: '3600',
                         upsert: false
                     });
 
-                // If 405 error, try alternative bucket names
-                if (uploadResult.error && (uploadResult.error.status === 405 || uploadResult.error.message.includes('405'))) {
-                    console.log('Trying alternative bucket: supplier-media-public');
-                    bucketName = 'supplier-media-public';
-                    uploadResult = await supabase.storage
-                        .from(bucketName)
-                        .upload(fileName, file, {
-                            cacheControl: '3600',
-                            upsert: false
-                        });
-                }
-
-                // If still error, try with upsert=true
                 if (uploadResult.error) {
-                    console.log('Trying with upsert=true');
-                    uploadResult = await supabase.storage
-                        .from(bucketName)
-                        .upload(fileName, file, {
-                            cacheControl: '3600',
-                            upsert: true
-                        });
+                    console.error('❌ Cloud-Only Upload Failed:', uploadResult.error);
+                    
+                    // Specific 405 error guidance
+                    if (uploadResult.error.status === 405) {
+                        throw new Error('❌ 405 Error: Supabase Storage policies missing. Please run the SQL commands from fix_supabase_policies.sql in your Supabase Dashboard');
+                    }
+                    
+                    throw new Error(`Cloud upload failed: ${uploadResult.error.message}`);
                 }
 
-                const { data, error } = uploadResult;
-
-                if (error) {
-                    console.error('Final upload error:', {
-                        message: error.message,
-                        status: error.status,
-                        bucketUsed: bucketName
-                    });
-                    throw new Error(`Upload failed: ${error.message} (Status: ${error.status || 'unknown'})`);
-                }
-
-                // Get public URL
+                // Get public URL for cross-device access
                 const { data: publicData } = supabase.storage
                     .from(bucketName)
                     .getPublicUrl(fileName);
+                
+                if (!publicData?.publicUrl) {
+                    throw new Error('Failed to generate public URL for uploaded file');
+                }
 
-                console.log('✅ Upload successful:', publicData.publicUrl);
+                console.log('✅ Cloud-Only v4.0.0 Upload Complete:', publicData.publicUrl);
 
                 return {
                     publicUrl: publicData.publicUrl,
@@ -2064,8 +2061,8 @@
                         // Sync metadata to database
                         syncMediaToSupabase(currentSupplierId, supplierMedia[currentSupplierId]);
 
-                        console.log('✅ Cloud-only upload successful:', result.publicUrl);
-                        showNotification(`✅ ${file.name} đã upload lên cloud thành công!`, 'success');
+                        console.log('✅ Cloud-Only v4.0.0 upload successful:', result.publicUrl);
+                        showNotification(`✅ ${file.name} đã upload thành công! (Cloud-Only v4.0.0)`, 'success');
 
                     }).catch(error => {
                         // Remove failed item from array
@@ -2073,8 +2070,22 @@
                         renderMediaGrid();
                         updateCrossDeviceStatus();
 
-                        console.error('❌ Cloud upload failed:', error);
-                        showNotification(`❌ Upload thất bại: ${error.message}`, 'error');
+                        console.error('❌ Cloud-Only v4.0.0 Upload failed:', error);
+                        
+                        // Enhanced error handling for Cloud-Only v4.0.0
+                        let errorMessage = `Upload thất bại: ${file.name}`;
+                        
+                        if (error.message.includes('405')) {
+                            errorMessage = '❌ Lỗi 405: Cấu hình Supabase chưa đúng. Vui lòng chạy SQL từ file fix_supabase_policies.sql';
+                        } else if (error.message.includes('bucket')) {
+                            errorMessage = '❌ Lỗi bucket: Vui lòng kiểm tra cấu hình Supabase Storage';
+                        } else if (error.message.includes('network') || error.message.includes('fetch')) {
+                            errorMessage = '❌ Lỗi kết nối: Kiểm tra internet và thử lại';
+                        } else {
+                            errorMessage = `❌ Upload thất bại: ${error.message}`;
+                        }
+                        
+                        showNotification(errorMessage, 'error');
                     });
                 }
             });
@@ -2174,25 +2185,25 @@
             }
         }
         
+        // Cloud-Only v4.0.0: No local storage for media
         function saveMediaToStorage() {
-            // Skip localStorage when Supabase is connected to avoid quota issues
+            console.log('🌅 Cloud-Only v4.0.0: Media saved to Supabase only');
+            // All media data is handled via Supabase - no local storage
             if (!isSupabaseConnected) {
-                try {
-                    localStorage.setItem('supplierMedia', JSON.stringify(supplierMedia));
-                } catch (error) {
-                    if (error.name === 'QuotaExceededError') {
-                        console.warn('LocalStorage quota exceeded. Using Supabase as primary storage.');
-                        showNotification('Bộ nhớ local đầy. Dữ liệu được lưu trên cloud.', 'info');
-                    }
-                }
+                showNotification('❌ Cloud connection required - Cannot save media without Supabase', 'error');
+                return false;
             }
-            // When Supabase is connected, data is automatically synced to cloud
+            return true;
         }
         
+        // Cloud-Only v4.0.0: Load from Supabase only  
         function loadMediaFromStorage() {
-            const saved = localStorage.getItem('supplierMedia');
-            if (saved) {
-                supplierMedia = JSON.parse(saved);
+            console.log('🌅 Cloud-Only v4.0.0: Loading media from Supabase only');
+            // Media is loaded from Supabase via loadDataFromSupabase()
+            // No local storage fallback in cloud-only mode
+            if (!isSupabaseConnected) {
+                showNotification('❌ Cloud connection required to load media', 'error');
+                return;
             }
         }
         
