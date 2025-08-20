@@ -802,6 +802,28 @@
                 </div>
 
                 <!-- Cloud Storage Management -->
+                <!-- SMB Storage Configuration -->
+                <div>
+                    <h4 class="editable font-medium mb-3" data-key="smb-storage-title">SMB File Server</h4>
+                    <div class="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                        <div class="flex items-center justify-between mb-2">
+                            <label class="font-medium text-sm">Enable SMB Storage:</label>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" id="smbToggle" class="sr-only peer">
+                                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                            </label>
+                        </div>
+                        <div class="text-xs text-gray-600">
+                            <div>📁 SMB: smb://222.252.23.248/</div>
+                            <div>🌐 Server: http://localhost:8080</div>
+                            <div id="smbStatus" class="mt-1 font-medium">❌ Chưa kết nối</div>
+                        </div>
+                        <button id="testSmbServer" class="w-full mt-2 bg-blue-500 text-white py-1 px-2 rounded text-xs hover:bg-blue-600">
+                            Kiểm tra kết nối SMB Server
+                        </button>
+                    </div>
+                </div>
+
                 <div>
                     <h4 class="editable font-medium mb-3" data-key="cloud-storage-title">Quản Lý Cloud Storage</h4>
                     <div class="space-y-3">
@@ -1088,13 +1110,28 @@
 
     <script>
         // App Version for cache busting
-        const APP_VERSION = '2.7.0-local-only';
+        const APP_VERSION = '2.8.0-smb-integration';
         const BUILD_TIME = new Date().toISOString();
-        console.log(`🚨 LOCAL-ONLY MODE v${APP_VERSION} - Built: ${BUILD_TIME}`);
+        console.log(`🚀 SMB INTEGRATION v${APP_VERSION} - Built: ${BUILD_TIME}`);
 
-        // EMERGENCY: DISABLE SUPABASE STORAGE - USE LOCAL ONLY
-        const EMERGENCY_LOCAL_MODE = true;
-        console.log('🚨 EMERGENCY: Supabase Storage DISABLED - Using LOCAL ONLY mode');
+        // SMB File Server Configuration
+        const FILE_SERVER_CONFIG = {
+            enabled: false, // Set to true when file server is running
+            baseUrl: 'http://localhost:8080',
+            uploadEndpoint: '/upload',
+            filesEndpoint: '/files',
+            deleteEndpoint: '/files'
+        };
+
+        // Storage Mode Selection
+        const STORAGE_MODE = FILE_SERVER_CONFIG.enabled ? 'smb' : 'local';
+        console.log(`📁 Storage Mode: ${STORAGE_MODE.toUpperCase()}`);
+
+        if (STORAGE_MODE === 'smb') {
+            console.log('🔗 SMB File Server:', FILE_SERVER_CONFIG.baseUrl);
+        } else {
+            console.log('💾 Using Local Storage mode');
+        }
 
         // FORCE CACHE CLEAR
         const timestamp = Date.now();
@@ -1132,8 +1169,15 @@
             if (confirm('Bạn có chắc muốn xóa ảnh này?')) {
                 const mediaItem = mediaItems[index];
 
-                // Delete from Supabase if uploaded
-                if (mediaItem.supabase_path) {
+                // Delete from appropriate storage
+                if (mediaItem.uploaded_to_smb && mediaItem.smb_path) {
+                    try {
+                        await deleteFromFileServer(mediaItem.smb_path);
+                        console.log('✅ Deleted from SMB server:', mediaItem.smb_path);
+                    } catch (error) {
+                        console.error('Error deleting from SMB server:', error);
+                    }
+                } else if (mediaItem.supabase_path) {
                     try {
                         const { error } = await supabase.storage
                             .from('media-uploads')
@@ -1159,14 +1203,93 @@
             }
         };
 
-        console.log('✅ EMERGENCY deleteMediaItem function defined globally');
+        console.log('✅ deleteMediaItem function defined globally');
         console.log('🔍 Testing function availability:', typeof window.deleteMediaItem);
 
-        // IMMEDIATE TEST
-        if (typeof window.deleteMediaItem === 'function') {
-            console.log('✅ deleteMediaItem is available as function');
-        } else {
-            console.error('❌ deleteMediaItem is NOT available');
+        // SMB File Server Functions
+        async function uploadToFileServer(file, supplierId) {
+            try {
+                const formData = new FormData();
+                formData.append('file', file);
+                formData.append('supplierId', supplierId);
+
+                console.log('📤 Uploading to file server:', file.name);
+
+                const response = await fetch(`${FILE_SERVER_CONFIG.baseUrl}${FILE_SERVER_CONFIG.uploadEndpoint}`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Upload failed: ${response.status} ${response.statusText}`);
+                }
+
+                const result = await response.json();
+                console.log('✅ File server upload successful:', result);
+
+                return {
+                    url: result.url,
+                    path: result.path,
+                    filename: result.filename,
+                    size: result.size,
+                    type: 'smb'
+                };
+
+            } catch (error) {
+                console.error('❌ File server upload failed:', error);
+                throw error;
+            }
+        }
+
+        async function deleteFromFileServer(filePath) {
+            try {
+                console.log('🗑️ Deleting from file server:', filePath);
+
+                const response = await fetch(`${FILE_SERVER_CONFIG.baseUrl}${FILE_SERVER_CONFIG.deleteEndpoint}/${filePath}`, {
+                    method: 'DELETE'
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Delete failed: ${response.status} ${response.statusText}`);
+                }
+
+                const result = await response.json();
+                console.log('✅ File server delete successful:', result);
+                return true;
+
+            } catch (error) {
+                console.error('❌ File server delete failed:', error);
+                throw error;
+            }
+        }
+
+        async function testFileServer() {
+            try {
+                console.log('🔍 Testing file server connection...');
+
+                const response = await fetch(`${FILE_SERVER_CONFIG.baseUrl}/ping`);
+                if (!response.ok) {
+                    throw new Error(`Server not responding: ${response.status}`);
+                }
+
+                const result = await response.json();
+                console.log('✅ File server is running:', result);
+                return true;
+
+            } catch (error) {
+                console.error('❌ File server not available:', error);
+                return false;
+            }
+        }
+
+        // Test file server on load
+        if (STORAGE_MODE === 'smb') {
+            testFileServer().then(available => {
+                if (!available) {
+                    console.warn('⚠️ File server not available, falling back to local storage');
+                    // Could switch to local mode here
+                }
+            });
         }
 
         // Supabase Configuration - Auto-configured
@@ -1713,10 +1836,18 @@
                 
                 mediaGrid.innerHTML = media.map((item, index) => {
                     const isVideo = item.type.startsWith('video/');
-                    const imageUrl = item.supabase_url || item.url; // Use Supabase URL if available
-                    const uploadStatus = item.uploaded_to_supabase ? 
-                        '<div class="absolute top-2 right-2 bg-green-500 text-white text-xs px-2 py-1 rounded-full"><i class="fas fa-cloud-check mr-1"></i>Cloud</div>' : 
-                        '<div class="absolute top-2 right-2 bg-gray-500 text-white text-xs px-2 py-1 rounded-full"><i class="fas fa-hdd mr-1"></i>Local</div>';
+                    // Smart URL selection based on storage type
+                    const imageUrl = item.smb_url || item.supabase_url || item.url;
+
+                    // Dynamic upload status based on storage type
+                    let uploadStatus = '';
+                    if (item.uploaded_to_smb) {
+                        uploadStatus = '<div class="absolute top-2 right-2 bg-blue-500 text-white text-xs px-2 py-1 rounded-full"><i class="fas fa-server mr-1"></i>SMB</div>';
+                    } else if (item.uploaded_to_supabase) {
+                        uploadStatus = '<div class="absolute top-2 right-2 bg-green-500 text-white text-xs px-2 py-1 rounded-full"><i class="fas fa-cloud mr-1"></i>Cloud</div>';
+                    } else {
+                        uploadStatus = '<div class="absolute top-2 right-2 bg-gray-500 text-white text-xs px-2 py-1 rounded-full"><i class="fas fa-hdd mr-1"></i>Local</div>';
+                    }
                     
                     return `
                         <div class="media-item relative group" onclick="openFullscreenViewer(${index})">
@@ -1810,10 +1941,36 @@
                         renderMediaGrid();
                         showNotification(`Đã tải lên ${file.name} thành công!`);
                         
-                        // EMERGENCY: SKIP SUPABASE STORAGE - LOCAL ONLY
-                        if (EMERGENCY_LOCAL_MODE) {
-                            console.log('🚨 EMERGENCY MODE: Skipping Supabase Storage upload');
-                            showNotification('✅ Ảnh đã lưu cục bộ (Emergency Mode)', 'success');
+                        // Smart Storage Selection
+                        if (STORAGE_MODE === 'smb') {
+                            // Upload to SMB File Server
+                            console.log('📤 Uploading to SMB file server:', file.name);
+                            uploadToFileServer(file, currentSupplierId).then(result => {
+                                // Update media item with SMB info
+                                mediaItem.smb_url = result.url;
+                                mediaItem.smb_path = result.path;
+                                mediaItem.smb_filename = result.filename;
+                                mediaItem.uploaded_to_smb = true;
+                                mediaItem.storage_type = 'smb';
+
+                                saveMediaToStorage();
+                                renderMediaGrid();
+                                showNotification('✅ Ảnh đã upload lên SMB server!', 'success');
+
+                                // Still sync metadata to database if connected
+                                if (isSupabaseConnected) {
+                                    syncMediaToSupabase(currentSupplierId, supplierMedia[currentSupplierId]).catch(error => {
+                                        console.warn('⚠️ Metadata sync failed:', error);
+                                    });
+                                }
+                            }).catch(error => {
+                                console.error('❌ SMB upload failed:', error);
+                                showNotification('Lỗi upload lên SMB: ' + error.message, 'error');
+                            });
+                        } else {
+                            // Local storage mode
+                            console.log('💾 Using local storage mode');
+                            showNotification('✅ Ảnh đã lưu cục bộ', 'success');
 
                             // Still sync metadata to database if connected
                             if (isSupabaseConnected) {
@@ -1821,27 +1978,6 @@
                                 syncMediaToSupabase(currentSupplierId, supplierMedia[currentSupplierId]).catch(error => {
                                     console.warn('⚠️ Metadata sync failed:', error);
                                 });
-                            }
-                        } else {
-                            // Original Supabase upload logic
-                            if (isSupabaseConnected) {
-                                console.log('🔄 Starting immediate Supabase upload for:', file.name);
-                                uploadSingleMediaToSupabase(currentSupplierId, mediaItem).then(uploadedItem => {
-                                    if (uploadedItem) {
-                                        console.log('✅ Supabase upload successful:', uploadedItem.supabase_url);
-                                        saveMediaToStorage();
-                                        renderMediaGrid();
-                                        syncMediaToSupabase(currentSupplierId, supplierMedia[currentSupplierId]);
-                                    } else {
-                                        console.error('❌ Supabase upload failed for:', file.name);
-                                    }
-                                }).catch(error => {
-                                    console.error('❌ Upload error:', error);
-                                    showNotification('Lỗi upload lên cloud: ' + error.message, 'error');
-                                });
-                            } else {
-                                console.warn('⚠️ Supabase not connected - file saved locally only');
-                                showNotification('Ảnh đã lưu cục bộ. Kết nối Supabase để đồng bộ cloud.', 'warning');
                             }
                         }
                     };
@@ -2013,6 +2149,7 @@
 
         // Initialize
         document.addEventListener('DOMContentLoaded', function() {
+            loadSmbSettings(); // Load SMB configuration first
             loadTextSettings();
             updateEditIndicators();
             updateLastUpdated();
@@ -2618,6 +2755,63 @@
             }
         });
         
+        // SMB Server handlers
+        document.getElementById('smbToggle').addEventListener('change', function() {
+            const enabled = this.checked;
+            FILE_SERVER_CONFIG.enabled = enabled;
+
+            // Update global storage mode
+            window.STORAGE_MODE = enabled ? 'smb' : 'local';
+
+            // Save to localStorage
+            localStorage.setItem('smbEnabled', enabled);
+
+            if (enabled) {
+                showNotification('✅ SMB mode enabled', 'success');
+                testFileServer().then(available => {
+                    updateSmbStatus(available);
+                });
+            } else {
+                showNotification('💾 Local mode enabled', 'info');
+                updateSmbStatus(false);
+            }
+        });
+
+        document.getElementById('testSmbServer').addEventListener('click', async function() {
+            showNotification('🔍 Testing SMB server...', 'info');
+            const available = await testFileServer();
+            updateSmbStatus(available);
+
+            if (available) {
+                showNotification('✅ SMB server is running!', 'success');
+            } else {
+                showNotification('❌ SMB server not available', 'error');
+            }
+        });
+
+        function updateSmbStatus(available) {
+            const statusEl = document.getElementById('smbStatus');
+            if (available) {
+                statusEl.innerHTML = '✅ Đã kết nối';
+                statusEl.className = 'mt-1 font-medium text-green-600';
+            } else {
+                statusEl.innerHTML = '❌ Chưa kết nối';
+                statusEl.className = 'mt-1 font-medium text-red-600';
+            }
+        }
+
+        // Load SMB settings
+        function loadSmbSettings() {
+            const smbEnabled = localStorage.getItem('smbEnabled') === 'true';
+            document.getElementById('smbToggle').checked = smbEnabled;
+            FILE_SERVER_CONFIG.enabled = smbEnabled;
+            window.STORAGE_MODE = smbEnabled ? 'smb' : 'local';
+
+            if (smbEnabled) {
+                testFileServer().then(updateSmbStatus);
+            }
+        }
+
         document.getElementById('testBucket').addEventListener('click', async function() {
             showNotification('Đang kiểm tra bucket...', 'info');
             const bucketOk = await checkSupabaseBucket();
