@@ -1470,6 +1470,9 @@
                 window.isSupabaseConnected = true; // Global flag for testing
                 updateSupabaseStatus(true);
 
+                // Update storage status display immediately
+                updateStorageStatusDisplay();
+
                 // Clear old localStorage credentials to prevent conflicts
                 localStorage.removeItem('supabaseUrl');
                 localStorage.removeItem('supabaseKey');
@@ -1947,14 +1950,29 @@
             
             document.getElementById('galleryTitle').innerHTML = `<i class="fas fa-images"></i>${supplierName} - Hình ảnh sản phẩm`;
             
-            // Update storage status info
+            // Update storage status info - Check both local and global flags
             const storageStatus = document.getElementById('storageStatus');
-            if (isSupabaseConnected) {
+            const supabaseReady = isSupabaseConnected || window.isSupabaseConnected || false;
+
+            console.log('🔍 Storage status check:', {
+                isSupabaseConnected,
+                windowFlag: window.isSupabaseConnected,
+                supabaseReady
+            });
+
+            if (supabaseReady) {
                 storageStatus.innerHTML = '<i class="fas fa-cloud text-green-500 mr-1"></i>Ảnh sẽ được upload lên Supabase Cloud';
                 storageStatus.parentElement.style.background = '#dcfce7';
+                console.log('✅ Storage status: Supabase Cloud');
             } else {
-                storageStatus.innerHTML = '<i class="fas fa-hdd text-gray-500 mr-1"></i>Ảnh sẽ được lưu cục bộ (Local)';
-                storageStatus.parentElement.style.background = '#f1f5f9';
+                storageStatus.innerHTML = '<i class="fas fa-exclamation-triangle text-orange-500 mr-1"></i>Đang kết nối Supabase Cloud...';
+                storageStatus.parentElement.style.background = '#fef3c7';
+                console.log('⏳ Storage status: Connecting to Supabase...');
+
+                // Try to update status after a short delay
+                setTimeout(() => {
+                    updateStorageStatusDisplay();
+                }, 1000);
             }
             
             // Update delete all button visibility
@@ -1978,6 +1996,25 @@
         function closeMediaGallery() {
             document.getElementById('mediaGallery').classList.remove('active');
             currentSupplierId = null;
+            window.currentSupplierId = null;
+        }
+
+        // Update storage status display based on current Supabase connection
+        function updateStorageStatusDisplay() {
+            const storageStatus = document.getElementById('storageStatus');
+            if (!storageStatus) return;
+
+            const supabaseReady = isSupabaseConnected || window.isSupabaseConnected || false;
+
+            if (supabaseReady) {
+                storageStatus.innerHTML = '<i class="fas fa-cloud text-green-500 mr-1"></i>Ảnh sẽ được upload lên Supabase Cloud';
+                storageStatus.parentElement.style.background = '#dcfce7';
+                console.log('✅ Storage status updated: Supabase Cloud ready');
+            } else {
+                storageStatus.innerHTML = '<i class="fas fa-exclamation-triangle text-orange-500 mr-1"></i>Đang kết nối Supabase Cloud...';
+                storageStatus.parentElement.style.background = '#fef3c7';
+                console.log('⏳ Storage status: Still connecting...');
+            }
         }
         
         function renderMediaGrid() {
@@ -2104,7 +2141,14 @@
         function handleFiles(files) {
             console.log('🚀 handleFiles called with', files.length, 'files');
             console.log('📊 Current supplier ID:', currentSupplierId);
-            console.log('🔗 Supabase connected:', isSupabaseConnected);
+
+            // Check both local and global Supabase connection flags
+            const supabaseReady = isSupabaseConnected || window.isSupabaseConnected || false;
+            console.log('🔗 Supabase connection check:', {
+                isSupabaseConnected,
+                windowFlag: window.isSupabaseConnected,
+                supabaseReady
+            });
 
             if (!currentSupplierId) {
                 console.error('❌ No supplier selected');
@@ -2112,9 +2156,10 @@
                 return;
             }
 
-            if (!isSupabaseConnected) {
-                console.error('❌ Supabase not connected');
-                alert('Chưa kết nối Supabase. Ảnh sẽ chỉ lưu cục bộ.');
+            if (!supabaseReady) {
+                console.error('❌ Supabase not connected - Cloud-Only mode requires connection');
+                showNotification('❌ Chưa kết nối Supabase Cloud. Vui lòng đợi kết nối hoàn tất.', 'error');
+                return; // Stop execution - no fallback to localStorage
             }
 
             Array.from(files).forEach((file, index) => {
@@ -2125,7 +2170,9 @@
                 });
                 if (file.type.startsWith('image/') || file.type.startsWith('video/')) {
                     // CLOUD-ONLY: Upload directly to Supabase, no local storage
-                    if (!isSupabaseConnected) {
+                    // This check should not be needed since we already checked above, but keeping for safety
+                    if (!supabaseReady) {
+                        console.error('❌ Supabase not ready for file:', file.name);
                         showNotification('❌ Không thể upload: Chưa kết nối Supabase Cloud', 'error');
                         return;
                     }
