@@ -4,20 +4,23 @@
   "description": "Ứng dụng quản lý nhà cung cấp Thượng Hải với Supabase integration",
   "main": "index.html",
   "scripts": {
-    "start": "echo 'Static HTML app - no build required'",
-    "build": "mkdir -p public && cp *.html public/ && echo 'Files copied to public directory'"
+    "start": "echo 'Static HTML app ready'",
+    "build": "echo 'No build step required for static HTML app'",
+    "dev": "python3 -m http.server 8080",
+    "test": "echo 'Tests run separately with Playwright'"
   },
   "keywords": [
     "supplier",
     "catalog",
     "shanghai",
     "supabase",
-    "vietnam"
+    "vietnam",
+    "static-site"
   ],
   "author": "hksdtp",
   "license": "MIT",
   "homepage": "https://github.com/hksdtp/ncc",
-  "dependencies": {
+  "devDependencies": {
     "@playwright/test": "^1.55.0",
     "puppeteer": "^24.16.2",
     "puppeteer-core": "^24.16.2"

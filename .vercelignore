@@ -1,4 +1,47 @@
+# Git and IDE
 .git
 .claude
-node_modules
+.vscode/
+.idea/
+
+# Dependencies
+node_modules/
+.npm/
+.yarn/
+
+# Testing files
+test_screenshots/
+*.test.js
+*test*.js
+comprehensive_bucket_test.js
+test_bucket_*.js
+test_optimized_webapp.js
+test_webapp_fix.js
+
+# Development tools
+.serena/
+serena*
+*.py
+*.sh
+quick_serena_test.sh
+setup_*.sh
+install_*.sh
+
+# SQL scripts
+*.sql
+
+# Logs
 *.log
+npm-debug.log*
+yarn-debug.log*
+
+# Environment files
+.env*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Documentation (except README)
+*.md
+!README.md
