@@ -1588,6 +1588,14 @@
                 // Auto-sync data immediately for faster startup
                 syncAllDataToSupabase();
 
+                // Setup periodic sync for cross-device updates (every 30 seconds)
+                setInterval(() => {
+                    if (isSupabaseConnected) {
+                        console.log('🔄 Periodic sync check...');
+                        loadDataFromSupabase();
+                    }
+                }, 30000);
+
             } catch (error) {
                 console.error('❌ Supabase connection failed:', error);
                 isSupabaseConnected = false;
@@ -1934,6 +1942,12 @@
                 }
                 
                 showNotification('Dữ liệu đã được tải từ Supabase', 'success');
+
+                // Force refresh current gallery if open to show new data
+                if (currentSupplierId && window.renderMediaGrid) {
+                    console.log('🔄 Refreshing gallery after data load');
+                    window.renderMediaGrid();
+                }
             } catch (error) {
                 console.error('Error loading data from Supabase:', error);
 
@@ -2047,6 +2061,12 @@
         // Expose global variables for deleteMediaItem function
         window.supplierMedia = supplierMedia;
         window.currentSupplierId = currentSupplierId;
+
+        // Ensure global functions are available
+        window.saveMediaToStorage = saveMediaToStorage;
+        window.renderMediaGrid = renderMediaGrid;
+        window.syncMediaToSupabase = syncMediaToSupabase;
+        window.showNotification = showNotification;
         
         // Media Gallery Functions
         function openMediaGallery(supplierId) {
@@ -2186,7 +2206,7 @@
                                 </div>
                                 ${uploadStatus}
                                 <button class="absolute top-2 left-2 bg-red-500 text-white text-xs px-2 py-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10"
-                                        onclick="event.stopPropagation(); deleteMediaItem(${index})"
+                                        onclick="event.stopPropagation(); console.log('🗑️ Delete button clicked for index:', ${index}); if(window.deleteMediaItem) { window.deleteMediaItem(${index}); } else { console.error('❌ deleteMediaItem not found!'); alert('Lỗi: Function delete không tìm thấy. Vui lòng refresh trang.'); }"
                                         title="Xóa ảnh lỗi">
                                     <i class="fas fa-trash"></i>
                                 </button>
@@ -2203,7 +2223,7 @@
                                 }
                                 ${uploadStatus}
                                 <button class="absolute top-2 left-2 bg-red-500 text-white text-xs px-2 py-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10"
-                                        onclick="event.stopPropagation(); deleteMediaItem(${index})"
+                                        onclick="event.stopPropagation(); console.log('🗑️ Delete button clicked for index:', ${index}); if(window.deleteMediaItem) { window.deleteMediaItem(${index}); } else { console.error('❌ deleteMediaItem not found!'); alert('Lỗi: Function delete không tìm thấy. Vui lòng refresh trang.'); }"
                                         title="Xóa ảnh">
                                     <i class="fas fa-trash"></i>
                                 </button>
