@@ -43,10 +43,5 @@
       "destination": "/api/rum-stub",
       "permanent": false
     }
-  ],
-  "functions": {
-    "api/rum-stub.js": {
-      "runtime": "nodejs18.x"
-    }
-  }
+  ]
 }
