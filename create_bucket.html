@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create Supabase Bucket</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .status {
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        .success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .info { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        .warning { background: #fff3cd; color: #856404; border: 1px solid #ffeaa7; }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+        }
+        button:hover { background: #0056b3; }
+        button:disabled { background: #6c757d; cursor: not-allowed; }
+        .log {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🪣 Create Supabase Bucket</h1>
+        <p>This tool will help you create a storage bucket for the supplier media app.</p>
+        
+        <div id="status" class="status info">
+            Ready to create bucket. Click the button below to start.
+        </div>
+        
+        <button id="createBtn" onclick="createBucket()">Create Bucket</button>
+        <button id="listBtn" onclick="listBuckets()">List Existing Buckets</button>
+        <button id="testBtn" onclick="testUpload()">Test Upload</button>
+        
+        <div id="log" class="log">Waiting for action...</div>
+    </div>
+
+    <script>
+        const SUPABASE_URL = 'https://hukhojlhmvpjmiyageqg.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh1a2hvamxobXZwam1peWFnZXFnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU2ODAwMTQsImV4cCI6MjA3MTI1NjAxNH0.g6KFGNEYtxxvjhc48m1Z3RLwW96g8_j3yPkv_Ly1zo8';
+        
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        
+        function log(message) {
+            const logDiv = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            logDiv.textContent += `[${timestamp}] ${message}\n`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+            console.log(message);
+        }
+        
+        function setStatus(message, type = 'info') {
+            const statusDiv = document.getElementById('status');
+            statusDiv.textContent = message;
+            statusDiv.className = `status ${type}`;
+        }
+        
+        async function listBuckets() {
+            try {
+                log('📊 Listing existing buckets...');
+                setStatus('Checking existing buckets...', 'info');
+                
+                const { data: buckets, error } = await supabase.storage.listBuckets();
+                
+                if (error) {
+                    log(`❌ Error listing buckets: ${error.message}`);
+                    setStatus(`Error: ${error.message}`, 'error');
+                    return;
+                }
+                
+                if (buckets && buckets.length > 0) {
+                    log(`✅ Found ${buckets.length} bucket(s):`);
+                    buckets.forEach(bucket => {
+                        log(`   - ${bucket.name} (public: ${bucket.public})`);
+                    });
+                    setStatus(`Found ${buckets.length} existing bucket(s)`, 'success');
+                } else {
+                    log('📭 No buckets found');
+                    setStatus('No buckets found - need to create one', 'warning');
+                }
+                
+            } catch (error) {
+                log(`❌ Unexpected error: ${error.message}`);
+                setStatus(`Unexpected error: ${error.message}`, 'error');
+            }
+        }
+        
+        async function createBucket() {
+            try {
+                log('🚀 Starting bucket creation process...');
+                setStatus('Creating bucket...', 'info');
+                
+                // First list existing buckets
+                await listBuckets();
+                
+                // Try to create supplier-media bucket
+                const bucketName = 'supplier-media';
+                log(`🔧 Attempting to create bucket: ${bucketName}`);
+                
+                const { data, error } = await supabase.storage.createBucket(bucketName, {
+                    public: true,
+                    allowedMimeTypes: ['image/*', 'video/*'],
+                    fileSizeLimit: 52428800 // 50MB
+                });
+                
+                if (error) {
+                    log(`❌ Failed to create ${bucketName}: ${error.message}`);
+                    
+                    // Try alternative names
+                    const alternatives = ['media', 'uploads', 'files', 'storage'];
+                    
+                    for (const altName of alternatives) {
+                        log(`🔄 Trying alternative: ${altName}`);
+                        
+                        const { data: altData, error: altError } = await supabase.storage.createBucket(altName, {
+                            public: true
+                        });
+                        
+                        if (!altError) {
+                            log(`✅ Successfully created bucket: ${altName}`);
+                            setStatus(`Successfully created bucket: ${altName}`, 'success');
+                            return;
+                        } else {
+                            log(`❌ Failed to create ${altName}: ${altError.message}`);
+                        }
+                    }
+                    
+                    setStatus('Failed to create any bucket. Check Supabase permissions.', 'error');
+                } else {
+                    log(`✅ Successfully created bucket: ${bucketName}`);
+                    setStatus(`Successfully created bucket: ${bucketName}`, 'success');
+                }
+                
+            } catch (error) {
+                log(`❌ Unexpected error: ${error.message}`);
+                setStatus(`Unexpected error: ${error.message}`, 'error');
+            }
+        }
+        
+        async function testUpload() {
+            try {
+                log('🧪 Testing upload functionality...');
+                setStatus('Testing upload...', 'info');
+
+                // First list buckets to find available one
+                const { data: buckets, error: listError } = await supabase.storage.listBuckets();
+
+                if (listError || !buckets || buckets.length === 0) {
+                    log('❌ No buckets available for testing');
+                    setStatus('No buckets available for testing', 'error');
+                    return;
+                }
+
+                // Prefer supplier-media bucket, fallback to first available
+                let bucketName = buckets.find(b => b.name === 'supplier-media')?.name ||
+                                buckets.find(b => b.name === 'media-uploads')?.name ||
+                                buckets[0].name;
+
+                log(`📤 Testing upload to bucket: ${bucketName}`);
+
+                // Test multiple file types
+                const testFiles = [
+                    {
+                        content: 'This is a test text file created at ' + new Date().toISOString(),
+                        type: 'text/plain',
+                        extension: 'txt',
+                        name: 'text-test'
+                    },
+                    {
+                        content: JSON.stringify({test: true, timestamp: new Date().toISOString()}, null, 2),
+                        type: 'application/json',
+                        extension: 'json',
+                        name: 'json-test'
+                    },
+                    {
+                        content: 'name,value,timestamp\ntest,123,' + new Date().toISOString(),
+                        type: 'text/csv',
+                        extension: 'csv',
+                        name: 'csv-test'
+                    }
+                ];
+
+                let successCount = 0;
+                let totalTests = testFiles.length;
+
+                for (const testFile of testFiles) {
+                    const blob = new Blob([testFile.content], { type: testFile.type });
+                    const fileName = `${testFile.name}-${Date.now()}.${testFile.extension}`;
+
+                    log(`📄 Testing ${testFile.type} file: ${fileName}`);
+
+                    const { data, error } = await supabase.storage
+                        .from(bucketName)
+                        .upload(fileName, blob);
+
+                    if (error) {
+                        log(`❌ ${testFile.type} upload failed: ${error.message}`);
+                    } else {
+                        log(`✅ ${testFile.type} upload successful: ${fileName}`);
+                        successCount++;
+
+                        // Try to get public URL
+                        const { data: publicData } = supabase.storage
+                            .from(bucketName)
+                            .getPublicUrl(fileName);
+
+                        if (publicData?.publicUrl) {
+                            log(`🌐 Public URL: ${publicData.publicUrl}`);
+                        }
+                    }
+
+                    // Small delay between uploads
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                }
+
+                // Summary
+                log(`📊 Upload test summary: ${successCount}/${totalTests} successful`);
+
+                if (successCount === totalTests) {
+                    setStatus('All upload tests successful!', 'success');
+                } else if (successCount > 0) {
+                    setStatus(`Partial success: ${successCount}/${totalTests} uploads worked`, 'warning');
+                } else {
+                    setStatus('All upload tests failed', 'error');
+                }
+
+            } catch (error) {
+                log(`❌ Test error: ${error.message}`);
+                setStatus(`Test error: ${error.message}`, 'error');
+            }
+        }
+        
+        // Auto-check buckets on page load
+        window.addEventListener('load', () => {
+            setTimeout(listBuckets, 1000);
+        });
+    </script>
+</body>
+</html>

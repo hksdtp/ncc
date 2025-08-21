@@ -590,6 +590,42 @@
             margin-bottom: 1rem;
             color: #d1d5db;
         }
+
+        /* Notification Styles */
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 12px 20px;
+            border-radius: 8px;
+            color: white;
+            font-weight: 500;
+            z-index: 9999;
+            transform: translateX(400px);
+            transition: transform 0.3s ease;
+            max-width: 400px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+
+        .notification.show {
+            transform: translateX(0);
+        }
+
+        .notification.success {
+            background-color: #10b981;
+        }
+
+        .notification.error {
+            background-color: #ef4444;
+        }
+
+        .notification.warning {
+            background-color: #f59e0b;
+        }
+
+        .notification.info {
+            background-color: #3b82f6;
+        }
     </style>
 </head>
 <body class="bg-gray-50 font-sans">
@@ -608,8 +644,8 @@
                 </div>
                 
 
-                <!-- Settings Menu -->
-                <div class="no-print">
+
+                <div class="no-print" style="display: none;">
                     <button id="settingsBtn" class="p-2 text-gray-400 hover:text-gray-600 transition">
                         <i class="fas fa-cog text-xl"></i>
                     </button>
@@ -783,7 +819,7 @@
     </div>
 
     <!-- Settings Panel -->
-    <div id="settingsPanel" class="slide-panel fixed top-0 right-0 h-full w-80 bg-white shadow-xl z-50 overflow-y-auto no-print">
+    <div id="settingsPanel" class="slide-panel fixed top-0 right-0 h-full w-80 bg-white shadow-xl z-50 overflow-y-auto no-print" style="display: none;">
         <div class="p-6">
             <div class="flex justify-between items-center mb-6">
                 <h3 class="editable text-lg font-semibold" data-key="settings-title">Cài Đặt & Xuất Dữ Liệu</h3>
@@ -873,10 +909,7 @@
         </div>
     </div>
 
-    <!-- Notification -->
-    <div id="notification" class="notification">
-        <span id="notificationText"></span>
-    </div>
+
 
     <!-- Supplier Edit Modal -->
     <div id="supplierEditModal" class="modal">
@@ -1208,26 +1241,48 @@
                 // Cloud-Only v4.0.0: Use standard bucket name from policies
                 const bucketName = 'supplier-media';
                 
-                // Ensure bucket exists and is public
-                const { data: buckets } = await supabase.storage.listBuckets();
-                const bucketExists = buckets?.some(bucket => bucket.name === bucketName);
-                
-                if (!bucketExists) {
-                    console.log('🔧 Creating bucket:', bucketName);
-                    const { error: createError } = await supabase.storage.createBucket(bucketName, {
-                        public: true,
-                        allowedMimeTypes: ['image/*', 'video/*'],
-                        fileSizeLimit: 52428800 // 50MB
-                    });
-                    
-                    if (createError && !createError.message.includes('already exists')) {
-                        throw new Error(`Failed to create bucket: ${createError.message}`);
+                // Check available buckets (don't create new ones due to RLS)
+                const { data: buckets, error: listError } = await supabase.storage.listBuckets();
+                console.log('📊 Available buckets:', buckets?.map(b => b.name) || 'none');
+
+                if (listError) {
+                    console.error('❌ Error listing buckets:', listError);
+                    throw new Error(`Failed to list buckets: ${listError.message}`);
+                }
+
+                // Use existing bucket or fallback to default
+                const availableBuckets = buckets?.map(b => b.name) || [];
+                let finalBucketName = bucketName;
+
+                if (availableBuckets.includes(bucketName)) {
+                    console.log('✅ Using target bucket:', bucketName);
+                } else if (availableBuckets.length > 0) {
+                    // Use first available bucket
+                    finalBucketName = availableBuckets[0];
+                    console.log('🔄 Using available bucket:', finalBucketName);
+                } else {
+                    // Try to create a simple bucket as fallback
+                    console.log('🔧 No buckets found, attempting to create default bucket...');
+                    try {
+                        const { error: createError } = await supabase.storage.createBucket('media', {
+                            public: true
+                        });
+
+                        if (createError && !createError.message.includes('already exists')) {
+                            console.error('❌ Failed to create bucket:', createError);
+                            throw new Error('No storage buckets available and cannot create new bucket. Please create a bucket in Supabase dashboard first.');
+                        } else {
+                            finalBucketName = 'media';
+                            console.log('✅ Created and using bucket: media');
+                        }
+                    } catch (createErr) {
+                        throw new Error('No storage buckets available. Please create a bucket in Supabase dashboard first.');
                     }
                 }
                 
                 // Single upload attempt - no fallbacks (Cloud-Only v4.0.0)
                 const uploadResult = await supabase.storage
-                    .from(bucketName)
+                    .from(finalBucketName)
                     .upload(fileName, file, {
                         cacheControl: '3600',
                         upsert: false
@@ -1246,7 +1301,7 @@
 
                 // Get public URL for cross-device access
                 const { data: publicData } = supabase.storage
-                    .from(bucketName)
+                    .from(finalBucketName)
                     .getPublicUrl(fileName);
                 
                 if (!publicData?.publicUrl) {
@@ -1333,6 +1388,13 @@
         // Initialize Supabase with retry logic
         function initSupabase() {
             try {
+                // Check if Supabase library is loaded
+                if (!window.supabase) {
+                    console.error('Supabase library not loaded yet. Retrying...');
+                    setTimeout(initSupabase, 1000);
+                    return;
+                }
+
                 if (SUPABASE_URL !== 'YOUR_SUPABASE_URL' && SUPABASE_ANON_KEY !== 'YOUR_SUPABASE_ANON_KEY') {
                     // Create Supabase client with better config
                     supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
@@ -1348,20 +1410,10 @@
                             }
                         }
                     });
-                    isSupabaseConnected = true;
-                    console.log('Supabase auto-connected successfully');
 
-                    // Update UI to show connected status
-                    updateSupabaseStatus(true);
+                    // Test connection by trying to access storage
+                    testSupabaseConnection();
 
-                    // Clear old localStorage credentials to prevent conflicts
-                    localStorage.removeItem('supabaseUrl');
-                    localStorage.removeItem('supabaseKey');
-
-                    // Auto-sync data on load with delay
-                    setTimeout(() => {
-                        syncAllDataToSupabase();
-                    }, 2000);
                 } else {
                     console.log('Supabase not configured. Using localStorage only.');
                     updateSupabaseStatus(false);
@@ -1372,7 +1424,46 @@
                 updateSupabaseStatus(false);
             }
         }
-        
+
+        // Test Supabase connection - Optimized for speed
+        async function testSupabaseConnection() {
+            try {
+                console.log('🔍 Testing Supabase connection...');
+
+                // Test storage access with timeout
+                const timeoutPromise = new Promise((_, reject) =>
+                    setTimeout(() => reject(new Error('Connection timeout')), 3000)
+                );
+
+                const connectionPromise = supabase.storage.listBuckets();
+                const { data: buckets, error } = await Promise.race([connectionPromise, timeoutPromise]);
+
+                if (error) {
+                    throw error;
+                }
+
+                console.log('✅ Supabase connection successful!', buckets);
+                isSupabaseConnected = true;
+                window.isSupabaseConnected = true; // Global flag for testing
+                updateSupabaseStatus(true);
+
+                // Clear old localStorage credentials to prevent conflicts
+                localStorage.removeItem('supabaseUrl');
+                localStorage.removeItem('supabaseKey');
+
+                // Auto-sync data immediately for faster startup
+                syncAllDataToSupabase();
+
+            } catch (error) {
+                console.error('❌ Supabase connection failed:', error);
+                isSupabaseConnected = false;
+                window.isSupabaseConnected = false; // Global flag for testing
+                updateSupabaseStatus(false);
+                // Removed notification to avoid showing warning during normal startup
+                console.log('⏳ Will retry Supabase connection...');
+            }
+        }
+
         // Sync functions
         async function syncSuppliersToSupabase() {
             if (!isSupabaseConnected) return;
@@ -1456,20 +1547,13 @@
                 let uploadResult;
                 let bucketName = 'media-uploads';
 
-                // If no buckets exist, try to create one
+                // Use existing buckets only (no creation due to RLS)
                 if (!buckets || buckets.length === 0) {
-                    console.log('🔧 No buckets found, trying to create media-uploads...');
-                    const { data: createResult, error: createError } = await supabase.storage.createBucket('media-uploads', {
-                        public: true,
-                        allowedMimeTypes: ['image/*', 'video/*'],
-                        fileSizeLimit: 52428800 // 50MB
-                    });
-
-                    if (createError) {
-                        console.error('❌ Failed to create bucket:', createError);
-                    } else {
-                        console.log('✅ Created bucket successfully:', createResult);
-                    }
+                    throw new Error('❌ No storage buckets available. Please create a bucket in Supabase dashboard first.');
+                } else {
+                    // Use first available bucket
+                    bucketName = buckets[0].name;
+                    console.log('✅ Using available bucket:', bucketName);
                 }
 
                 // Try primary bucket first
@@ -1647,7 +1731,8 @@
                     }
                 }
                 
-                showNotification('Đồng bộ dữ liệu thành công!', 'success');
+                // Show brief success notification
+                showNotification('✅ Kết nối thành công', 'success');
             } catch (error) {
                 console.error('Error syncing all data:', error);
                 showNotification('Lỗi đồng bộ dữ liệu: ' + error.message, 'error');
@@ -2190,19 +2275,20 @@
             console.log('🌅 Cloud-Only v4.0.0: Media saved to Supabase only');
             // All media data is handled via Supabase - no local storage
             if (!isSupabaseConnected) {
-                showNotification('❌ Cloud connection required - Cannot save media without Supabase', 'error');
+                console.log('⏳ Waiting for Supabase connection to save media...');
                 return false;
             }
             return true;
         }
         
-        // Cloud-Only v4.0.0: Load from Supabase only  
+        // Cloud-Only v4.0.0: Load from Supabase only
         function loadMediaFromStorage() {
             console.log('🌅 Cloud-Only v4.0.0: Loading media from Supabase only');
             // Media is loaded from Supabase via loadDataFromSupabase()
             // No local storage fallback in cloud-only mode
+            // Removed notification to avoid showing error during initialization
             if (!isSupabaseConnected) {
-                showNotification('❌ Cloud connection required to load media', 'error');
+                console.log('⏳ Waiting for Supabase connection...');
                 return;
             }
         }
@@ -2258,16 +2344,21 @@
             updateEditIndicators();
             updateLastUpdated();
             loadSavedData();
-            loadMediaFromStorage();
-            
-            // Supabase auto-initialized on page load
-            
-            // Load data from Supabase if available
+
+            // Initialize Supabase connection immediately for faster startup
+            initSupabase();
+
+            // Load media after Supabase is ready
+            setTimeout(() => {
+                loadMediaFromStorage();
+            }, 100);
+
+            // Load data from Supabase with shorter delay
             setTimeout(() => {
                 if (isSupabaseConnected) {
                     loadDataFromSupabase();
                 }
-            }, 1000);
+            }, 800);
         });
         
         // Utility functions
@@ -2939,6 +3030,12 @@
             saveTextSettings();
         });
     </script>
+
+    <!-- Notification Element -->
+    <div id="notification" class="notification">
+        <span id="notificationText"></span>
+    </div>
+
 </body>
 </html>
     <script id="html_badge_script1">
