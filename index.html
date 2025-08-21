@@ -10,6 +10,78 @@
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <!-- CRITICAL: Define deleteMediaItem function IMMEDIATELY to prevent ReferenceError -->
+    <script>
+        // Global function definitions - Must be loaded before any HTML that uses them
+        window.deleteMediaItem = async function(index) {
+            console.log('🗑️ deleteMediaItem called with index:', index);
+            console.log('📊 Current supplier:', window.currentSupplierId);
+
+            if (!window.currentSupplierId) {
+                console.error('❌ No supplier selected');
+                alert('Vui lòng chọn nhà cung cấp trước');
+                return;
+            }
+
+            if (!window.supplierMedia || !window.supplierMedia[window.currentSupplierId]) {
+                console.error('❌ No media data found');
+                return;
+            }
+
+            const media = window.supplierMedia[window.currentSupplierId];
+            if (index < 0 || index >= media.length) {
+                console.error('❌ Invalid media index:', index);
+                return;
+            }
+
+            const mediaItem = media[index];
+            console.log('🗑️ Deleting media item:', mediaItem);
+
+            // Delete from Supabase Storage if it exists
+            if (mediaItem.supabase_path && window.supabase && window.isSupabaseConnected) {
+                try {
+                    const { error } = await window.supabase.storage
+                        .from('supplier-media')
+                        .remove([mediaItem.supabase_path]);
+
+                    if (error) {
+                        console.error('❌ Error deleting from Supabase:', error);
+                    } else {
+                        console.log('✅ Deleted from Supabase storage:', mediaItem.supabase_path);
+                    }
+                } catch (error) {
+                    console.error('❌ Supabase delete error:', error);
+                }
+            }
+
+            // Remove from local array
+            media.splice(index, 1);
+
+            // Save updated data
+            if (window.saveMediaToStorage) {
+                window.saveMediaToStorage();
+            }
+
+            // Re-render gallery
+            if (window.renderMediaGrid) {
+                window.renderMediaGrid();
+            }
+
+            // Sync to database
+            if (window.syncMediaToSupabase && window.isSupabaseConnected) {
+                window.syncMediaToSupabase(window.currentSupplierId, media);
+            }
+
+            console.log('✅ Media item deleted successfully');
+            if (window.showNotification) {
+                window.showNotification('✅ Đã xóa ảnh thành công', 'success');
+            }
+        };
+
+        console.log('✅ deleteMediaItem function defined globally at page load');
+    </script>
+
     <style>
         .editable {
             position: relative;
@@ -1175,57 +1247,8 @@
             });
         }
 
-        // CRITICAL: Define deleteMediaItem function IMMEDIATELY - EMERGENCY FIX
-        console.log('🚨 DEFINING deleteMediaItem FUNCTION NOW');
-
-        window.deleteMediaItem = async function(index) {
-            console.log('🗑️ EMERGENCY deleteMediaItem called with index:', index);
-            console.log('📊 Current supplier:', currentSupplierId);
-            console.log('🔍 Function called at:', new Date().toISOString());
-
-            if (!currentSupplierId) {
-                console.error('❌ No supplier selected');
-                return;
-            }
-
-            const mediaItems = supplierMedia[currentSupplierId];
-            if (!mediaItems || index >= mediaItems.length) {
-                console.error('❌ Invalid media index:', index);
-                return;
-            }
-
-            if (confirm('Bạn có chắc muốn xóa ảnh này?')) {
-                const mediaItem = mediaItems[index];
-
-                // Delete from Supabase if uploaded
-                if (mediaItem.supabase_path) {
-                    try {
-                        const { error } = await supabase.storage
-                            .from('supplier-media')
-                            .remove([mediaItem.supabase_path]);
-
-                        if (error) {
-                            console.error('Error deleting from Supabase:', error);
-                        } else {
-                            console.log('✅ Deleted from Supabase:', mediaItem.supabase_path);
-                        }
-                    } catch (error) {
-                        console.error('Error deleting from Supabase:', error);
-                    }
-                }
-
-                // Remove from local array
-                mediaItems.splice(index, 1);
-                saveMediaToStorage();
-                renderMediaGrid();
-                showNotification('Đã xóa ảnh thành công!', 'success');
-
-                console.log('✅ Media item deleted successfully');
-            }
-        };
-
-        console.log('✅ deleteMediaItem function defined globally');
-        console.log('🔍 Testing function availability:', typeof window.deleteMediaItem);
+        // deleteMediaItem function now defined in <head> for immediate availability
+        console.log('✅ deleteMediaItem function should be available from page load');
 
         // Cloud-Only Upload Function
         async function uploadFileToSupabaseStorage(file, supplierId) {
@@ -1899,7 +1922,7 @@
         
         let productsData = {};
         
-        // Media storage for suppliers
+        // Media storage for suppliers - Global access for deleteMediaItem
         let supplierMedia = {
             1: [],
             2: [],
@@ -1907,13 +1930,18 @@
             4: [],
             5: []
         };
-        
+
         let currentSupplierId = null;
+
+        // Expose global variables for deleteMediaItem function
+        window.supplierMedia = supplierMedia;
+        window.currentSupplierId = currentSupplierId;
         
         // Media Gallery Functions
         function openMediaGallery(supplierId) {
             console.log('Opening media gallery for supplier:', supplierId);
             currentSupplierId = supplierId;
+            window.currentSupplierId = supplierId; // Update global reference
             const supplier = suppliersData[supplierId];
             const supplierName = supplier ? supplier.name : `Nhà cung cấp ${supplierId}`;
             
@@ -2270,15 +2298,43 @@
             }
         }
         
-        // Cloud-Only v4.0.0: No local storage for media
+        // Cloud-Only v4.0.0: Save metadata only (no binary data)
         function saveMediaToStorage() {
-            console.log('🌅 Cloud-Only v4.0.0: Media saved to Supabase only');
-            // All media data is handled via Supabase - no local storage
+            console.log('🌅 Cloud-Only v4.0.0: Saving metadata only to localStorage');
+
             if (!isSupabaseConnected) {
-                console.log('⏳ Waiting for Supabase connection to save media...');
+                console.log('⏳ Waiting for Supabase connection...');
                 return false;
             }
-            return true;
+
+            try {
+                // Only save metadata (URLs, paths, timestamps) - no binary data
+                const metadataOnly = {};
+                Object.keys(supplierMedia).forEach(supplierId => {
+                    metadataOnly[supplierId] = supplierMedia[supplierId].map(item => ({
+                        name: item.name,
+                        type: item.type,
+                        timestamp: item.timestamp,
+                        supabase_url: item.supabase_url,
+                        supabase_path: item.supabase_path,
+                        uploaded_to_supabase: item.uploaded_to_supabase,
+                        file_size: item.file_size
+                        // Explicitly exclude 'url' property which contains base64 data
+                    }));
+                });
+
+                localStorage.setItem('supplierMedia', JSON.stringify(metadataOnly));
+                console.log('✅ Metadata saved to localStorage (Cloud-Only v4.0.0)');
+                return true;
+            } catch (error) {
+                if (error.name === 'QuotaExceededError') {
+                    console.warn('LocalStorage quota exceeded. Using Supabase as primary storage.');
+                    // Clear localStorage and rely on Supabase only
+                    localStorage.removeItem('supplierMedia');
+                }
+                console.error('Error saving metadata:', error);
+                return false;
+            }
         }
         
         // Cloud-Only v4.0.0: Load from Supabase only
@@ -2388,6 +2444,7 @@
         // Supplier Modal Functions
         function openSupplierEditModal(supplierId) {
             currentSupplierId = supplierId;
+            window.currentSupplierId = supplierId; // Update global reference
             const supplier = suppliersData[supplierId];
             
             if (!supplier) {
