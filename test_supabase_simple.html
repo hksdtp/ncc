@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Quick Supabase Test</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+    <h1>Quick Supabase Test</h1>
+    <div id="result"></div>
+    
+    <script>
+        const SUPABASE_URL = 'https://hukhojlhmvpjmiyageqg.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh1a2hvamxobXZwam1peWFnZXFnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU2ODAwMTQsImV4cCI6MjA3MTI1NjAxNH0.g6KFGNEYtxxvjhc48m1Z3RLwW96g8_j3yPkv_Ly1zo8';
+        
+        async function testSupabase() {
+            const result = document.getElementById('result');
+            
+            try {
+                result.innerHTML = '🔍 Testing Supabase...';
+                
+                if (!window.supabase) {
+                    throw new Error('Supabase library not loaded');
+                }
+                
+                const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+                
+                const { data, error } = await supabase.storage.listBuckets();
+                
+                if (error) {
+                    throw error;
+                }
+                
+                result.innerHTML = `
+                    <h2>✅ Supabase Connection Successful!</h2>
+                    <p>Found ${data.length} buckets:</p>
+                    <ul>${data.map(bucket => `<li>${bucket.name}</li>`).join('')}</ul>
+                `;
+                
+            } catch (error) {
+                result.innerHTML = `
+                    <h2>❌ Supabase Connection Failed</h2>
+                    <p>Error: ${error.message}</p>
+                `;
+            }
+        }
+        
+        // Test when page loads
+        window.addEventListener('load', () => {
+            setTimeout(testSupabase, 1000);
+        });
+    </script>
+</body>
+</html>

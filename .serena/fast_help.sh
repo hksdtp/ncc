@@ -1,0 +1,16 @@
+#!/bin/bash
+# Fast Serena help - cached version
+echo "🤖 FAST SERENA COMMANDS"
+echo "======================"
+echo "⚡ Fast commands (1-2 seconds):"
+echo "   ./.serena/fast_list_dir.sh [path]     - List directory"
+echo "   ./.serena/fast_read_file.sh [file]    - Read file"
+echo "   ./.serena/fast_find_symbol.sh [term]  - Find symbol"
+echo ""
+echo "🐌 Full Serena commands (30+ seconds):"
+echo "   ./.serena/slow_serena.sh --help       - Full Serena help"
+echo "   ./.serena/slow_tools.sh list          - List all tools"
+echo ""
+echo "📊 Status commands:"
+echo "   ./quick_serena_test.sh                - Quick status"
+echo "   python3 serena_dashboard.py          - Full dashboard"

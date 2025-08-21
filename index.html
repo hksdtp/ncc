@@ -1238,6 +1238,114 @@
         document.documentElement.setAttribute('data-version', APP_VERSION);
         document.documentElement.setAttribute('data-timestamp', timestamp);
 
+        // 🛡️ FIX VERCEL RUM 404 ERRORS
+        // Intercept and suppress Cloudflare/Vercel RUM tracking requests that cause 404s
+        (function suppressRUMErrors() {
+            console.log('🛡️ Installing RUM error suppression...');
+
+            // Override fetch to intercept RUM requests
+            const originalFetch = window.fetch;
+            window.fetch = function(...args) {
+                const url = args[0];
+                if (typeof url === 'string' && url.includes('/cdn-cgi/rum')) {
+                    console.log('🚫 Blocked RUM request to prevent 404:', url);
+                    // Return a resolved promise to prevent errors
+                    return Promise.resolve(new Response('{}', {
+                        status: 200,
+                        statusText: 'OK',
+                        headers: { 'Content-Type': 'application/json' }
+                    }));
+                }
+                return originalFetch.apply(this, args);
+            };
+
+            // Override XMLHttpRequest for older RUM implementations
+            const originalXHROpen = XMLHttpRequest.prototype.open;
+            XMLHttpRequest.prototype.open = function(method, url, ...args) {
+                if (typeof url === 'string' && url.includes('/cdn-cgi/rum')) {
+                    console.log('🚫 Blocked XHR RUM request to prevent 404:', url);
+                    // Create a dummy request that does nothing
+                    this._isRUMRequest = true;
+                    return;
+                }
+                return originalXHROpen.apply(this, [method, url, ...args]);
+            };
+
+            const originalXHRSend = XMLHttpRequest.prototype.send;
+            XMLHttpRequest.prototype.send = function(...args) {
+                if (this._isRUMRequest) {
+                    // Simulate successful response for RUM requests
+                    setTimeout(() => {
+                        if (this.onload) this.onload();
+                        if (this.onreadystatechange) {
+                            this.readyState = 4;
+                            this.status = 200;
+                            this.responseText = '{}';
+                            this.onreadystatechange();
+                        }
+                    }, 0);
+                    return;
+                }
+                return originalXHRSend.apply(this, args);
+            };
+
+            console.log('✅ RUM error suppression installed successfully');
+        })();
+
+        // 🛡️ FIX VERCEL RUM 404 ERRORS
+        // Intercept and suppress Cloudflare/Vercel RUM tracking requests that cause 404s
+        (function suppressRUMErrors() {
+            console.log('🛡️ Installing RUM error suppression...');
+
+            // Override fetch to intercept RUM requests
+            const originalFetch = window.fetch;
+            window.fetch = function(...args) {
+                const url = args[0];
+                if (typeof url === 'string' && url.includes('/cdn-cgi/rum')) {
+                    console.log('🚫 Blocked RUM request to prevent 404:', url);
+                    // Return a resolved promise to prevent errors
+                    return Promise.resolve(new Response('{}', {
+                        status: 200,
+                        statusText: 'OK',
+                        headers: { 'Content-Type': 'application/json' }
+                    }));
+                }
+                return originalFetch.apply(this, args);
+            };
+
+            // Override XMLHttpRequest for older RUM implementations
+            const originalXHROpen = XMLHttpRequest.prototype.open;
+            XMLHttpRequest.prototype.open = function(method, url, ...args) {
+                if (typeof url === 'string' && url.includes('/cdn-cgi/rum')) {
+                    console.log('🚫 Blocked XHR RUM request to prevent 404:', url);
+                    // Create a dummy request that does nothing
+                    this._isRUMRequest = true;
+                    return;
+                }
+                return originalXHROpen.apply(this, [method, url, ...args]);
+            };
+
+            const originalXHRSend = XMLHttpRequest.prototype.send;
+            XMLHttpRequest.prototype.send = function(...args) {
+                if (this._isRUMRequest) {
+                    // Simulate successful response for RUM requests
+                    setTimeout(() => {
+                        if (this.onload) this.onload();
+                        if (this.onreadystatechange) {
+                            this.readyState = 4;
+                            this.status = 200;
+                            this.responseText = '{}';
+                            this.onreadystatechange();
+                        }
+                    }, 0);
+                    return;
+                }
+                return originalXHRSend.apply(this, args);
+            };
+
+            console.log('✅ RUM error suppression installed successfully');
+        })();
+
         // Force cache refresh
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.getRegistrations().then(function(registrations) {

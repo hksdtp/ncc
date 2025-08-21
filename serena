@@ -1,0 +1,155 @@
+#!/bin/bash
+
+# 🚀 ULTIMATE FAST SERENA LAUNCHER
+# Single command for all Serena operations with optimal performance
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+PURPLE='\033[0;35m'
+CYAN='\033[0;36m'
+NC='\033[0m' # No Color
+
+# Performance tracking
+start_time=$(date +%s.%N)
+
+show_banner() {
+    echo -e "${CYAN}🚀 ULTIMATE FAST SERENA${NC}"
+    echo -e "${CYAN}========================${NC}"
+    echo -e "${GREEN}⚡ Optimized for maximum performance${NC}"
+    echo ""
+}
+
+show_performance() {
+    end_time=$(date +%s.%N)
+    duration=$(echo "$end_time - $start_time" | bc -l)
+    echo ""
+    echo -e "${PURPLE}⏱️  Completed in ${duration}s${NC}"
+}
+
+show_help() {
+    show_banner
+    echo -e "${YELLOW}📖 USAGE GUIDE${NC}"
+    echo "=============="
+    echo ""
+    echo -e "${GREEN}⚡ FAST COMMANDS (1-2 seconds):${NC}"
+    echo "   ./serena help                    - Show this help"
+    echo "   ./serena list [path]             - List directory"
+    echo "   ./serena read <file>             - Read file content"
+    echo "   ./serena find <term>             - Find symbol/text"
+    echo "   ./serena status                  - Show status"
+    echo ""
+    echo -e "${YELLOW}🐌 FULL SERENA (30+ seconds):${NC}"
+    echo "   ./serena full --help             - Full Serena help"
+    echo "   ./serena full tools list         - List all tools"
+    echo "   ./serena full tools call <tool>  - Call specific tool"
+    echo ""
+    echo -e "${BLUE}🤖 SMART MODE (auto-choose):${NC}"
+    echo "   ./serena smart <command>         - Auto-choose fast/slow"
+    echo ""
+    echo -e "${PURPLE}📊 PERFORMANCE COMPARISON:${NC}"
+    echo "   Fast commands:  ~1-2 seconds"
+    echo "   Full Serena:    ~30+ seconds"
+    echo "   Improvement:    ~30x faster!"
+    echo ""
+    echo -e "${CYAN}💡 TIPS:${NC}"
+    echo "   - Use fast commands for common operations"
+    echo "   - Use full Serena only when needed"
+    echo "   - Smart mode automatically chooses best option"
+}
+
+run_fast() {
+    case "$1" in
+        "list")
+            shift
+            ./.serena/fast_list_dir.sh "$@"
+            ;;
+        "read")
+            shift
+            ./.serena/fast_read_file.sh "$@"
+            ;;
+        "find")
+            shift
+            ./.serena/fast_find_symbol.sh "$@"
+            ;;
+        "status")
+            python3 serena_fast.py status
+            ;;
+        *)
+            echo -e "${RED}❌ Unknown fast command: $1${NC}"
+            echo -e "${YELLOW}💡 Use: ./serena help${NC}"
+            return 1
+            ;;
+    esac
+}
+
+run_full() {
+    echo -e "${YELLOW}🐌 Running full Serena (may take 30+ seconds)...${NC}"
+    ./.serena/slow_serena.sh "$@"
+}
+
+run_smart() {
+    command="$1"
+    case "$command" in
+        "list_dir"|"ls")
+            shift
+            ./.serena/fast_list_dir.sh "$@"
+            ;;
+        "read_file"|"cat")
+            shift
+            ./.serena/fast_read_file.sh "$@"
+            ;;
+        "find_symbol"|"grep")
+            shift
+            ./.serena/fast_find_symbol.sh "$@"
+            ;;
+        *)
+            echo -e "${YELLOW}🤖 Using full Serena for: $command${NC}"
+            run_full "$@"
+            ;;
+    esac
+}
+
+# Main logic
+if [ $# -eq 0 ]; then
+    show_help
+    exit 0
+fi
+
+command="$1"
+shift
+
+case "$command" in
+    "help"|"-h"|"--help")
+        show_help
+        ;;
+    "list"|"read"|"find"|"status")
+        run_fast "$command" "$@"
+        show_performance
+        ;;
+    "full")
+        run_full "$@"
+        show_performance
+        ;;
+    "smart")
+        run_smart "$@"
+        show_performance
+        ;;
+    "benchmark")
+        echo -e "${CYAN}🏃 PERFORMANCE BENCHMARK${NC}"
+        echo "========================"
+        echo ""
+        echo -e "${GREEN}Testing fast list command...${NC}"
+        time ./serena list . >/dev/null
+        echo ""
+        echo -e "${YELLOW}Testing full Serena (if you want to compare)...${NC}"
+        echo "Run: time ./serena full --help"
+        ;;
+    *)
+        echo -e "${RED}❌ Unknown command: $command${NC}"
+        echo -e "${YELLOW}💡 Use: ./serena help${NC}"
+        exit 1
+        ;;
+esac

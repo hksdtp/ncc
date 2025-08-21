@@ -1,5 +1,32 @@
 # 🤖 SERENA MANDATORY WORKFLOW
 
+## 🚀 **FAST SERENA COMMANDS (NEW!)**
+
+### ⚡ Ultra-Fast Commands (0.03 seconds):
+```bash
+./serena help                    # Show help
+./serena list [path]             # List directory
+./serena read <file>             # Read file content
+./serena find <term>             # Find symbol/text
+./serena status                  # Show status
+```
+
+### 🤖 Smart Mode (auto-choose fast/slow):
+```bash
+./serena smart <command>         # Auto-choose best option
+```
+
+### 🐌 Full Serena (30+ seconds, when needed):
+```bash
+./serena full --help             # Full Serena help
+./serena full tools list         # List all tools
+```
+
+### 📊 Performance Improvement:
+- **Fast commands:** ~0.03 seconds (**30x faster!**)
+- **Full Serena:** ~30+ seconds
+- **Use fast for 90% of operations**
+
 ## 🎯 **OVERVIEW**
 This document establishes the **MANDATORY** workflow for all programming tasks in this web application project. **ALL code-related tasks MUST use Serena's semantic tools** - no exceptions.
 

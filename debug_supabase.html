@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Supabase Connection Debug</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .status { padding: 10px; margin: 10px 0; border-radius: 5px; }
+        .success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .warning { background: #fff3cd; color: #856404; border: 1px solid #ffeaa7; }
+        .info { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 5px; overflow-x: auto; }
+        button { padding: 10px 20px; margin: 5px; border: none; border-radius: 5px; cursor: pointer; }
+        .btn-primary { background: #007bff; color: white; }
+        .btn-success { background: #28a745; color: white; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Supabase Connection Debug Tool</h1>
+    
+    <div id="status"></div>
+    
+    <button class="btn-primary" onclick="testConnection()">Test Connection</button>
+    <button class="btn-success" onclick="testUpload()">Test Upload</button>
+    
+    <div id="logs"></div>
+
+    <script>
+        // Supabase Configuration
+        const SUPABASE_URL = 'https://hukhojlhmvpjmiyageqg.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh1a2hvamxobXZwam1peWFnZXFnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU2ODAwMTQsImV4cCI6MjA3MTI1NjAxNH0.g6KFGNEYtxxvjhc48m1Z3RLwW96g8_j3yPkv_Ly1zo8';
+        
+        let supabase;
+        
+        function log(message, type = 'info') {
+            const logs = document.getElementById('logs');
+            const div = document.createElement('div');
+            div.className = `status ${type}`;
+            div.innerHTML = `<strong>${new Date().toLocaleTimeString()}:</strong> ${message}`;
+            logs.appendChild(div);
+            console.log(message);
+        }
+        
+        function updateStatus(message, type = 'info') {
+            const status = document.getElementById('status');
+            status.className = `status ${type}`;
+            status.innerHTML = message;
+        }
+        
+        async function initSupabase() {
+            try {
+                log('🚀 Initializing Supabase...', 'info');
+                
+                if (!window.supabase) {
+                    throw new Error('Supabase library not loaded');
+                }
+                
+                supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+                    auth: {
+                        persistSession: false
+                    },
+                    db: {
+                        schema: 'public'
+                    }
+                });
+                
+                log('✅ Supabase client created successfully', 'success');
+                updateStatus('✅ Supabase client initialized', 'success');
+                
+            } catch (error) {
+                log(`❌ Error initializing Supabase: ${error.message}`, 'error');
+                updateStatus(`❌ Initialization failed: ${error.message}`, 'error');
+            }
+        }
+        
+        async function testConnection() {
+            try {
+                log('🔍 Testing Supabase connection...', 'info');
+                
+                if (!supabase) {
+                    await initSupabase();
+                }
+                
+                // Test storage access
+                const { data: buckets, error } = await supabase.storage.listBuckets();
+                
+                if (error) {
+                    throw error;
+                }
+                
+                log(`✅ Connection successful! Found ${buckets.length} buckets`, 'success');
+                log(`📁 Buckets: ${JSON.stringify(buckets.map(b => b.name), null, 2)}`, 'info');
+                updateStatus('✅ Supabase connection working!', 'success');
+                
+            } catch (error) {
+                log(`❌ Connection failed: ${error.message}`, 'error');
+                updateStatus(`❌ Connection failed: ${error.message}`, 'error');
+            }
+        }
+        
+        async function testUpload() {
+            try {
+                log('📤 Testing file upload...', 'info');
+                
+                if (!supabase) {
+                    await initSupabase();
+                }
+                
+                // Create a test file
+                const testContent = 'Test file content - ' + new Date().toISOString();
+                const testFile = new Blob([testContent], { type: 'text/plain' });
+                const fileName = `test-${Date.now()}.txt`;
+                
+                // Upload to supplier-media bucket
+                const { data, error } = await supabase.storage
+                    .from('supplier-media')
+                    .upload(fileName, testFile);
+                
+                if (error) {
+                    throw error;
+                }
+                
+                log(`✅ Upload successful! File: ${fileName}`, 'success');
+                log(`📁 Upload data: ${JSON.stringify(data, null, 2)}`, 'info');
+                
+                // Get public URL
+                const { data: publicData } = supabase.storage
+                    .from('supplier-media')
+                    .getPublicUrl(fileName);
+                
+                log(`🌐 Public URL: ${publicData.publicUrl}`, 'info');
+                updateStatus('✅ Upload test successful!', 'success');
+                
+            } catch (error) {
+                log(`❌ Upload failed: ${error.message}`, 'error');
+                updateStatus(`❌ Upload failed: ${error.message}`, 'error');
+            }
+        }
+        
+        // Initialize on page load
+        window.addEventListener('load', () => {
+            log('🌐 Page loaded, initializing...', 'info');
+            setTimeout(initSupabase, 500);
+        });
+    </script>
+</body>
+</html>
